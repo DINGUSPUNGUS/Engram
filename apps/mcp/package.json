@@ -1,0 +1,9 @@
+{
+  "name": "@engram/mcp",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "lint": "uv run ruff check src",
+    "typecheck": "uv run mypy src"
+  }
+}

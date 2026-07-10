@@ -1,0 +1,36 @@
+name: Bug report
+description: Something behaves wrongly
+labels: ["bug", "triage"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. engram init
+        2. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      placeholder: output of `engram --version` or a commit sha
+  - type: input
+    id: platform
+    attributes:
+      label: OS & Python/Node versions
+      placeholder: e.g. Windows 11, Python 3.13.2, Node 22.12
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Redact memory content — logs may contain personal data.
+      render: text

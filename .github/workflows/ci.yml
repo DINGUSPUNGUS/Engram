@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      python: ${{ steps.filter.outputs.python }}
+      node: ${{ steps.filter.outputs.node }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            python:
+              - "libs/**"
+              - "apps/api/**"
+              - "apps/cli/**"
+              - "apps/mcp/**"
+              - "pyproject.toml"
+              - "uv.lock"
+            node:
+              - "apps/web/**"
+              - "packages/**"
+              - "package.json"
+              - "pnpm-lock.yaml"
+              - "turbo.json"
+              - "biome.json"
+
+  python:
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.13"
+      - run: uv sync --all-packages
+      - name: Lint (ruff)
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+      - name: Layering contract (import-linter)
+        run: uv run lint-imports
+      - name: Typecheck (mypy strict)
+        run: >-
+          uv run mypy
+          libs/engram-events/src libs/engram-core/src
+          libs/engram-storage-sqlite/src libs/engram-export-git/src
+          apps/api/src apps/cli/src apps/mcp/src
+      - name: Test (pytest)
+        run: uv run pytest libs apps -ra
+
+  node:
+    needs: changes
+    if: needs.changes.outputs.node == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Lint (biome)
+        run: pnpm exec biome ci .
+      - name: Typecheck, test, build (turbo)
+        run: pnpm exec turbo run typecheck test build
+
+  contract:
+    # The OpenAPI schema and the generated TS client must never drift.
+    needs: changes
+    if: needs.changes.outputs.python == 'true' || needs.changes.outputs.node == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.13"
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: uv sync --all-packages
+      - run: pnpm install --frozen-lockfile
+      - name: Regenerate client from the API
+        run: pnpm gen:client
+      - name: Fail on drift
+        run: git diff --exit-code -- packages/api-client
+
+  pr-title:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

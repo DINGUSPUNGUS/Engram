@@ -1,0 +1,8 @@
+# LF everywhere, on every platform (matches .editorconfig and all tooling).
+* text=auto eol=lf
+
+# Binary-safe defaults
+*.png binary
+*.jpg binary
+*.ico binary
+*.db binary

@@ -1,0 +1,16 @@
+# Release pipeline — intentionally a stub until there is something to release.
+# Planned shape: tag v* → build wheels (uv build) + web standalone + docker images,
+# publish GitHub Release with artifacts and generated changelog.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "Release automation lands with the first releasable milestone (roadmap phase 1)."
+          echo "Tag: ${GITHUB_REF_NAME}"

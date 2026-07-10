@@ -1,0 +1,23 @@
+{
+  "name": "engram",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "lint:architecture": "uv run lint-imports",
+    "format": "biome format --write .",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "gen:client": "pnpm --filter @engram/api-client generate"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.0.0",
+    "turbo": "2.5.4"
+  }
+}

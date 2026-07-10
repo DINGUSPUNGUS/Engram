@@ -1,0 +1,8 @@
+# Default reviewers. Replace with real handles/teams as the maintainer group forms.
+# * @your-github-handle
+#
+# Suggested split once there are area maintainers:
+# /libs/engram-events/  @core-maintainers
+# /libs/engram-core/    @core-maintainers
+# /apps/web/            @frontend-maintainers
+# /docs/adr/            @core-maintainers

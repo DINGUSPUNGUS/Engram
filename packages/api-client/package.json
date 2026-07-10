@@ -1,0 +1,22 @@
+{
+  "name": "@engram/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Type-safe TypeScript client for the engram REST API, generated from the OpenAPI contract.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "generate": "uv run python -m engram_api.export_openapi openapi.json && openapi-typescript openapi.json -o src/generated/schema.d.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "openapi-fetch": "^0.13.0"
+  },
+  "devDependencies": {
+    "@engram/config-ts": "workspace:*",
+    "openapi-typescript": "^7.5.0",
+    "typescript": "^5.7.0"
+  }
+}

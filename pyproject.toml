@@ -1,0 +1,104 @@
+[project]
+name = "engram-workspace"
+version = "0.0.0"
+description = "Workspace root for the engram monorepo (not a distributable package)."
+requires-python = ">=3.13"
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["apps/api", "apps/cli", "apps/mcp", "libs/*"]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.9.0",
+    "mypy>=1.14.0",
+    "pytest>=8.3.0",
+    "pytest-cov>=6.0.0",
+    "httpx>=0.28.0",
+    "import-linter>=2.1",
+]
+
+# ---------------------------------------------------------------------------
+# Ruff — lint + format for all Python packages (discovered upward from each)
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+    "TC",  # flake8-type-checking
+    "TID", # flake8-tidy-imports
+    "RUF", # ruff-specific
+]
+
+[tool.ruff.lint.isort]
+known-first-party = [
+    "engram_events",
+    "engram_core",
+    "engram_storage_sqlite",
+    "engram_export_git",
+    "engram_api",
+    "engram_cli",
+    "engram_mcp",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Alembic migration files are generated scaffolding
+"**/migrations/*" = ["I", "UP"]
+
+# ---------------------------------------------------------------------------
+# mypy — strict everywhere
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_unreachable = true
+show_error_codes = true
+
+[[tool.mypy.overrides]]
+module = ["git.*", "sqlmodel.*", "alembic.*"]
+ignore_missing_imports = true
+
+# ---------------------------------------------------------------------------
+# pytest — markers shared by every package; each package runs its own tests/
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+markers = [
+    "unit: pure in-memory tests, no I/O (default expectation)",
+    "integration: tests that touch a real SQLite file or git repository",
+]
+addopts = "-ra --strict-markers"
+
+# ---------------------------------------------------------------------------
+# import-linter — the layering rules are CI-enforced, not just documented.
+# Arrows point inward only: apps -> adapters -> core -> events.
+# ---------------------------------------------------------------------------
+[tool.importlinter]
+root_packages = [
+    "engram_events",
+    "engram_core",
+    "engram_storage_sqlite",
+    "engram_export_git",
+    "engram_api",
+    "engram_cli",
+]
+
+[[tool.importlinter.contracts]]
+name = "Hexagonal layering (inward-only imports)"
+type = "layers"
+layers = [
+    "engram_api | engram_cli",
+    "engram_storage_sqlite | engram_export_git",
+    "engram_core",
+    "engram_events",
+]

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "globalEnv": ["ENGRAM_*", "NEXT_PUBLIC_API_URL", "NEXT_OUTPUT"],
+  "globalPassThroughEnv": [
+    "HOME",
+    "USERPROFILE",
+    "HOMEDRIVE",
+    "HOMEPATH",
+    "APPDATA",
+    "LOCALAPPDATA",
+    "PROGRAMFILES",
+    "SYSTEMROOT",
+    "UV_*",
+    "VIRTUAL_ENV"
+  ],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {
+      "inputs": ["src/**", "tests/**", "*.json", "*.toml"]
+    },
+    "typecheck": {
+      "inputs": ["src/**", "tests/**", "tsconfig*.json", "pyproject.toml"]
+    },
+    "test": {
+      "inputs": ["src/**", "tests/**", "pyproject.toml", "vitest.config.*"]
+    }
+  }
+}

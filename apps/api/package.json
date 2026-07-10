@@ -1,0 +1,11 @@
+{
+  "name": "@engram/api",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "uv run uvicorn engram_api.main:app --reload --host 127.0.0.1 --port 8000",
+    "lint": "uv run ruff check src tests",
+    "typecheck": "uv run mypy src",
+    "test": "uv run pytest tests"
+  }
+}

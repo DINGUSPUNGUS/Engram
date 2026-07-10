@@ -1,0 +1,4 @@
+{
+  "extends": "@engram/config-ts/tsconfig.lib.json",
+  "include": ["src"]
+}
