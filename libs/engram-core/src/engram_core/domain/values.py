@@ -1,7 +1,8 @@
-"""Value objects: identity, slugs, types, links, salience.
+"""Value objects: identity, slugs, kinds, links, and the justification spine.
 
-Identity rule (ADR-0003): a memory *is* its UUIDv7. Slugs and filenames are mutable,
-human-friendly projections and must never be used as identity.
+The model of record is docs/memory-model.md. Identity rule (ADR-0003): a memory *is*
+its UUIDv7; slugs and filenames are mutable projections. Spine rule (ADR-0009): these
+values record *signals*; scores are derived in projections.
 """
 
 import re
@@ -52,41 +53,119 @@ class Slug:
         return self.value
 
 
-class MemoryType(StrEnum):
-    """Coarse classification; also the top-level directory in the markdown export."""
+class MemoryKind(StrEnum):
+    """The twelve first-class memory kinds (memory-model.md §1-2, ADR-0008).
+
+    Immutable after creation; also the top-level directory of the markdown export.
+    """
 
     FACT = "fact"
     PREFERENCE = "preference"
+    PERSON = "person"
+    ORGANIZATION = "organization"
     PROJECT = "project"
-    REFERENCE = "reference"
-    EPISODIC = "episodic"
+    SKILL = "skill"
+    GOAL = "goal"
+    CONTACT = "contact"
+    EVENT = "event"
+    LOCATION = "location"
+    ASSET = "asset"
+    RELATIONSHIP = "relationship"
 
 
 class LinkRelation(StrEnum):
-    """Typed graph edges between memories."""
+    """Closed tier-1 edge vocabulary, canonical directions (memory-model.md §6).
 
-    RELATES_TO = "relates_to"
-    SUPERSEDES = "supersedes"
-    DERIVED_FROM = "derived_from"
-    CONTRADICTS = "contradicts"
+    Extending this enum requires an ADR. Knowledge-bearing connections are reified
+    as ``MemoryKind.RELATIONSHIP`` objects instead (ADR-0010).
+    """
+
+    ABOUT = "about"  # any memory -> the entity it concerns
+    INVOLVES = "involves"  # project/event/goal -> person/org
+    PART_OF = "part_of"  # member -> whole
+    OWNED_BY = "owned_by"  # contact/asset -> person/org
+    WORKS_AT = "works_at"  # person -> organization
+    LOCATED_IN = "located_in"  # anything -> location
+    RELATES_TO = "relates_to"  # symmetric, weakest
+    SUPERSEDES = "supersedes"  # new -> old
+    DERIVED_FROM = "derived_from"  # conclusion -> source
+    CONTRADICTS = "contradicts"  # symmetric
 
 
 @dataclass(frozen=True, slots=True)
 class Link:
-    """A directed, typed edge from the owning memory to ``target_id``."""
+    """A directed, typed tier-1 edge from the owning memory to ``target_id``."""
 
     target_id: MemoryId
     relation: LinkRelation
 
 
-@dataclass(frozen=True, slots=True)
-class Salience:
-    """Inputs to future decay scoring. Fields only — the algorithm is roadmap work.
+# ---------------------------------------------------------------------------
+# The justification spine (memory-model.md §3): why does this deserve to exist?
+# ---------------------------------------------------------------------------
 
-    Captured from day 1 (via ``MemoryAccessed`` events) so decay can be computed
-    retroactively over the full history when it lands.
-    """
+
+class EvidenceType(StrEnum):
+    QUOTE = "quote"
+    URI = "uri"
+    CONVERSATION = "conversation"
+    DOCUMENT = "document"
+    OBSERVATION = "observation"
+
+
+@dataclass(frozen=True, slots=True)
+class EvidenceRef:
+    """One piece of support for a memory. Append-only — corrections add evidence."""
+
+    evidence_type: EvidenceType
+    value: str
+    note: str | None = None
+
+
+class RetentionPolicy(StrEnum):
+    PERMANENT = "permanent"  # never auto-archived
+    STANDARD = "standard"  # subject to decay (default)
+    UNTIL = "until"  # explicit expiry date
+    EPHEMERAL = "ephemeral"  # auto-archive after the kind's short horizon
+
+
+@dataclass(frozen=True, slots=True)
+class Lifetime:
+    """How long a memory should live (memory-model.md §4)."""
+
+    policy: RetentionPolicy = RetentionPolicy.STANDARD
+    until: datetime | None = None
+
+    def __post_init__(self) -> None:
+        if (self.policy is RetentionPolicy.UNTIL) != (self.until is not None):
+            raise ValidationError("lifetime 'until' requires a date, other policies forbid one")
+
+
+class Visibility(StrEnum):
+    """Who may recall a memory. Enforced at the query/recall boundary."""
+
+    SHARED = "shared"  # any connected assistant (default)
+    PRIVATE = "private"  # dashboard/CLI only, never surfaced to assistants
+    RESTRICTED = "restricted"  # allow-listed actors only
+
+
+@dataclass(frozen=True, slots=True)
+class ImportanceSignals:
+    """Stored importance *signals*; scores are computed in projections (ADR-0009)."""
 
     created_at: datetime
+    pinned: bool = False
+    user_weight: float | None = None  # explicit 0..1 override, None = unset
     last_accessed_at: datetime | None = None
     access_count: int = 0
+
+    def __post_init__(self) -> None:
+        if self.user_weight is not None and not 0.0 <= self.user_weight <= 1.0:
+            raise ValidationError(f"user_weight out of [0,1]: {self.user_weight}")
+
+
+def validate_confidence(value: float) -> float:
+    """Confidence is a plain float in [0,1]; every writer validates through here."""
+    if not 0.0 <= value <= 1.0:
+        raise ValidationError(f"confidence out of [0,1]: {value}")
+    return value

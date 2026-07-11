@@ -8,9 +8,17 @@ Two categories of table, with very different contracts:
 - Everything else is a **projection**: disposable, rebuilt by replaying the log
   (``engram rebuild``). Dropping a projection table loses nothing.
 
-UUIDs are stored as canonical lowercase strings; timestamps as UTC ISO-8601 —
-SQLite-friendly and greppable. FTS5 / sqlite-vec virtual tables are deliberately
-absent; their reserved names are documented in ADR-0001.
+The memory model of record is docs/memory-model.md: memories carry the twelve-kind
+``kind`` discriminator, a JSON ``attributes`` payload (validated against the
+KindRegistry *before* write — the DB stores only schema-valid data), and the
+justification spine. Kind-specific querying uses expression indexes on
+``json_extract(attributes, …)`` plus per-kind SQL views (created with the scoring
+projection in phase 2). Derived scores (effective confidence, retention) are NOT
+columns here — they live in the recomputable scoring projection (ADR-0009).
+
+UUIDs are stored as canonical lowercase strings; timestamps as UTC ISO-8601.
+FTS5 / sqlite-vec virtual tables are reserved by name (`memory_fts`,
+`memory_vectors`) and deliberately absent.
 """
 
 from datetime import datetime
@@ -47,20 +55,44 @@ class EventRecord(SQLModel, table=True):
 
 
 class MemoryRecord(SQLModel, table=True):
-    """Current state of one memory. Deleted memories have no row here —
-    their history lives on in ``events``."""
+    """Current state of one memory: kind, attributes, and the justification spine.
+    Deleted memories have no row here — their history lives on in ``events``."""
 
     __tablename__ = "memories"
 
     id: str = Field(primary_key=True)
+    kind: str = Field(index=True, description="One of the twelve MemoryKind values")
     slug: str = Field(unique=True)
-    memory_type: str = Field(index=True)
     title: str
     content: str
+    attributes: str = Field(description="JSON kind-schema payload (validated on write)")
+    attributes_schema_version: int = 1
+    confidence: float = Field(description="Stored confidence 0..1; decay is derived")
+    last_confirmed_at: datetime | None = None
+    lifetime_policy: str = Field(default="standard", index=True)
+    lifetime_until: datetime | None = None
+    visibility: str = Field(default="shared", index=True)
+    allowed_actors: str = Field(default="[]", description="JSON list; RESTRICTED only")
+    pinned: bool = Field(default=False, index=True)
+    user_weight: float | None = None
     archived: bool = Field(default=False, index=True)
     created_at: datetime
     updated_at: datetime
     version: int = Field(description="Last applied stream_seq; optimistic concurrency token")
+
+
+class EvidenceRecord(SQLModel, table=True):
+    """Justification-spine evidence, append-only per memory."""
+
+    __tablename__ = "evidence"
+
+    memory_id: str = Field(primary_key=True, foreign_key="memories.id")
+    seq: int = Field(primary_key=True, description="1-based per-memory order")
+    evidence_type: str
+    value: str
+    note: str | None = None
+    added_at: datetime
+    actor: str
 
 
 class MemoryTagRecord(SQLModel, table=True):
@@ -73,12 +105,12 @@ class MemoryTagRecord(SQLModel, table=True):
 
 
 class LinkRecord(SQLModel, table=True):
-    """Materialized graph edge between memories."""
+    """Materialized tier-1 graph edge (canonical direction only, ADR-0010)."""
 
     __tablename__ = "links"
 
     source_id: str = Field(primary_key=True, foreign_key="memories.id")
-    target_id: str = Field(primary_key=True, foreign_key="memories.id")
+    target_id: str = Field(primary_key=True)
     relation: str = Field(primary_key=True)
 
 

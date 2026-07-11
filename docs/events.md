@@ -22,17 +22,36 @@ Every event travels in an `EventEnvelope`:
 
 ## Memory events
 
+Creation & content:
+
 | Event | Emitted when | Payload highlights |
 | --- | --- | --- |
-| `MemoryCreated` | A memory is born | id, slug, title, content, type, tags |
-| `MemoryEdited` | Content-level change | sparse fields (None = unchanged) |
+| `MemoryCreated` | A typed memory is born | id, **kind**, slug, title, content, **attributes** (+schema version), tags, confidence, lifetime, visibility |
+| `MemoryEdited` | Narrative change (title/content/slug) | sparse fields; kind is immutable |
+| `MemoryAttributesUpdated` | Kind-schema fields change | sparse `changes` dict, validated against the KindRegistry |
 | `MemoryEditedExternally` | Reconciler detected a direct file edit | changed fields + source path |
+
+Justification spine (memory-model.md §3, §5):
+
+| Event | Emitted when | Payload highlights |
+| --- | --- | --- |
+| `MemoryConfirmed` | Someone vouched for it | note; raises confidence, resets staleness |
+| `MemoryContradicted` | Someone disputed it | contradicting_id, note; lowers confidence |
+| `MemoryEvidenceAdded` | Support attached | evidence_type, value, note (append-only) |
+| `MemoryImportanceAdjusted` | Pin/unpin, explicit weight | pinned?, user_weight? |
+| `MemoryVisibilityChanged` | Recall audience changes | visibility, allowed_actors |
+| `MemoryLifetimeChanged` | Retention policy changes | policy, until |
+
+Organization & lifecycle:
+
+| Event | Emitted when | Payload highlights |
+| --- | --- | --- |
 | `MemoryTagged` | Tags added/removed | added, removed |
-| `MemoryLinked` / `MemoryUnlinked` | Graph edge change | target_id, relation |
-| `MemoryMerged` | Another memory merged into this one | source_id, merged_content |
+| `MemoryLinked` / `MemoryUnlinked` | Tier-1 graph edge change | target_id, relation (closed vocabulary) |
+| `MemoryMerged` | Entity resolution: another memory merged in | source_id, merged_content |
 | `MemoryArchived` / `MemoryRestored` | Soft hide / unhide | reason |
-| `MemoryDeleted` | Tombstone (log persists) | reason |
-| `MemoryAccessed` | A consumer recalled it | context — feeds future decay |
+| `MemoryDeleted` | Tombstone (log persists; never automated) | reason |
+| `MemoryAccessed` | A consumer recalled it | context — retention-score input |
 
 ## Proposal events
 

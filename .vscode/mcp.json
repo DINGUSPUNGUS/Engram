@@ -1,0 +1,14 @@
+{
+  "servers": {
+    "vexp": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "c:\\Users\\juden\\.vscode\\extensions\\vexp.vexp-vscode-2.1.4-win32-x64\\dist\\mcp-server.cjs"
+      ],
+      "env": {
+        "VEXP_WORKSPACE": "d:\\.vscode\\Memory manager"
+      }
+    }
+  }
+}

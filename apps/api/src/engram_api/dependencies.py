@@ -17,6 +17,7 @@ from engram_core.application.queries.memory_queries import MemoryQueryService
 from engram_core.application.queries.search_queries import SearchQueryService
 from engram_core.application.queries.timeline_queries import TimelineQueryService
 from engram_core.domain.events import build_registry
+from engram_core.domain.kinds import KindRegistry, build_kind_registry
 from engram_events import EventRegistry, InProcessEventBus, Provenance
 
 
@@ -28,6 +29,11 @@ def get_settings() -> EngramSettings:
 @lru_cache(maxsize=1)
 def get_registry() -> EventRegistry:
     return build_registry()
+
+
+@lru_cache(maxsize=1)
+def get_kind_registry() -> KindRegistry:
+    return build_kind_registry()
 
 
 @lru_cache(maxsize=1)

@@ -5,7 +5,7 @@ from collections.abc import Sequence
 
 from engram_core.application.dto import SearchHit
 from engram_core.domain.ports import SearchIndex
-from engram_core.domain.values import MemoryType
+from engram_core.domain.values import MemoryKind
 
 
 class SearchQueryService:
@@ -18,9 +18,10 @@ class SearchQueryService:
         self,
         query: str,
         *,
-        memory_type: MemoryType | None = None,
+        kind: MemoryKind | None = None,
         tag: str | None = None,
         limit: int = 20,
     ) -> Sequence[SearchHit]:
-        """Ranked search over memories."""
+        """Ranked search over memories. Stale memories are down-ranked, never
+        hidden; visibility is enforced against the caller's principal."""
         raise NotImplementedError

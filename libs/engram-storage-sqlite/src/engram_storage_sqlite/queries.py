@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from sqlalchemy.engine import Engine
 
 from engram_core.application.dto import MemoryReadModel, Page, TimelineEntry
-from engram_core.domain.values import MemoryId, MemoryType
+from engram_core.domain.values import MemoryId, MemoryKind
 
 
 class SqliteMemoryQuery:
@@ -20,9 +20,10 @@ class SqliteMemoryQuery:
     def list_memories(
         self,
         *,
-        memory_type: MemoryType | None = None,
+        kind: MemoryKind | None = None,
         tag: str | None = None,
         include_archived: bool = False,
+        include_stale: bool = True,
         cursor: str | None = None,
         limit: int = 50,
     ) -> Page[MemoryReadModel]:

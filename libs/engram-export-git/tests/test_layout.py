@@ -5,13 +5,13 @@ from pathlib import Path, PurePosixPath
 import pytest
 
 from engram_core.domain.errors import ValidationError
-from engram_core.domain.values import MemoryType, Slug
+from engram_core.domain.values import MemoryKind, Slug
 from engram_export_git.layout import memory_relpath, resolve_inside
 
 
 @pytest.mark.unit
-def test_memory_relpath_is_type_sharded() -> None:
-    relpath = memory_relpath(MemoryType.PREFERENCE, Slug("kahnya-branding"))
+def test_memory_relpath_is_kind_sharded() -> None:
+    relpath = memory_relpath(MemoryKind.PREFERENCE, Slug("kahnya-branding"))
     assert relpath == PurePosixPath("memories/preference/kahnya-branding.md")
 
 

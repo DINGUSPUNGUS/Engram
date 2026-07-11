@@ -18,7 +18,7 @@ from engram_core.application.dto import (
 )
 from engram_core.domain.memory import Memory
 from engram_core.domain.proposal import Proposal
-from engram_core.domain.values import MemoryId, MemoryType, ProposalId
+from engram_core.domain.values import MemoryId, MemoryKind, ProposalId
 from engram_events import EventEnvelope
 
 # ---------------------------------------------------------------------------
@@ -81,9 +81,10 @@ class MemoryQuery(Protocol):
     def list_memories(
         self,
         *,
-        memory_type: MemoryType | None = None,
+        kind: MemoryKind | None = None,
         tag: str | None = None,
         include_archived: bool = False,
+        include_stale: bool = True,
         cursor: str | None = None,
         limit: int = 50,
     ) -> Page[MemoryReadModel]: ...
@@ -103,7 +104,7 @@ class SearchIndex(Protocol):
         self,
         query: str,
         *,
-        memory_type: MemoryType | None = None,
+        kind: MemoryKind | None = None,
         tag: str | None = None,
         limit: int = 20,
     ) -> Sequence[SearchHit]: ...

@@ -54,13 +54,13 @@ export interface paths {
         };
         /**
          * List Memories
-         * @description Cursor-paginated listing of current memory state.
+         * @description Cursor-paginated listing. Visibility is enforced against the principal.
          */
         get: operations["list_memories_api_v1_memories_get"];
         put?: never;
         /**
          * Create Memory
-         * @description Create a memory; returns its immutable id and initial state.
+         * @description Create a typed memory; attributes must satisfy the kind schema (422 otherwise).
          */
         post: operations["create_memory_api_v1_memories_post"];
         delete?: never;
@@ -78,7 +78,7 @@ export interface paths {
         };
         /**
          * Get Memory
-         * @description Current state of one memory.
+         * @description Current state of one memory, spine included.
          */
         get: operations["get_memory_api_v1_memories__memory_id__get"];
         put?: never;
@@ -92,9 +92,129 @@ export interface paths {
         head?: never;
         /**
          * Edit Memory
-         * @description Sparse edit. 409 when ``expected_version`` is stale.
+         * @description Sparse narrative edit (title/content/slug). 409 when ``expected_version`` is stale.
          */
         patch: operations["edit_memory_api_v1_memories__memory_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/memories/{memory_id}/attributes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Attributes
+         * @description Sparse change to kind-schema fields; validated against the KindRegistry.
+         */
+        patch: operations["update_attributes_api_v1_memories__memory_id__attributes_patch"];
+        trace?: never;
+    };
+    "/api/v1/memories/{memory_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Memory
+         * @description Vouch for a memory: raises confidence, resets staleness.
+         */
+        post: operations["confirm_memory_api_v1_memories__memory_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/memories/{memory_id}/contradict": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Contradict Memory
+         * @description Dispute a memory: lowers confidence, creates a ``contradicts`` edge.
+         */
+        post: operations["contradict_memory_api_v1_memories__memory_id__contradict_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/memories/{memory_id}/evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Evidence
+         * @description Append supporting evidence (append-only).
+         */
+        post: operations["add_evidence_api_v1_memories__memory_id__evidence_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/memories/{memory_id}/importance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Adjust Importance
+         * @description Pin/unpin or set the explicit user weight.
+         */
+        patch: operations["adjust_importance_api_v1_memories__memory_id__importance_patch"];
+        trace?: never;
+    };
+    "/api/v1/memories/{memory_id}/lifetime": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Set Lifetime
+         * @description Change the retention policy.
+         */
+        patch: operations["set_lifetime_api_v1_memories__memory_id__lifetime_patch"];
         trace?: never;
     };
     "/api/v1/memories/{memory_id}/timeline": {
@@ -135,6 +255,26 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/memories/{memory_id}/visibility": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Set Visibility
+         * @description Change who may recall this memory.
+         */
+        patch: operations["set_visibility_api_v1_memories__memory_id__visibility_patch"];
         trace?: never;
     };
     "/api/v1/proposals": {
@@ -276,15 +416,70 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** CreateMemoryRequest */
-        CreateMemoryRequest: {
-            /** Content */
-            content: string;
+        /** AddEvidenceRequest */
+        AddEvidenceRequest: {
             /**
-             * Memory Type
+             * Evidence Type
              * @enum {string}
              */
-            memory_type: "fact" | "preference" | "project" | "reference" | "episodic";
+            evidence_type: "quote" | "uri" | "conversation" | "document" | "observation";
+            /** Note */
+            note?: string | null;
+            /** Value */
+            value: string;
+        };
+        /** AdjustImportanceRequest */
+        AdjustImportanceRequest: {
+            /** Pinned */
+            pinned?: boolean | null;
+            /** User Weight */
+            user_weight?: number | null;
+        };
+        /** ConfirmRequest */
+        ConfirmRequest: {
+            /** Note */
+            note?: string | null;
+        };
+        /** ContradictRequest */
+        ContradictRequest: {
+            /** Contradicting Id */
+            contradicting_id?: string | null;
+            /** Note */
+            note?: string | null;
+        };
+        /** CreateMemoryRequest */
+        CreateMemoryRequest: {
+            /**
+             * Attributes
+             * @description Must satisfy the kind schema
+             * @default {}
+             */
+            attributes: {
+                [key: string]: unknown;
+            };
+            /**
+             * Confidence
+             * @description Omit to apply the source prior
+             */
+            confidence?: number | null;
+            /**
+             * Content
+             * @default
+             */
+            content: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "fact" | "preference" | "person" | "organization" | "project" | "skill" | "goal" | "contact" | "event" | "location" | "asset" | "relationship";
+            /**
+             * Lifetime Policy
+             * @default standard
+             * @enum {string}
+             */
+            lifetime_policy: "permanent" | "standard" | "until" | "ephemeral";
+            /** Lifetime Until */
+            lifetime_until?: string | null;
             /**
              * Slug
              * @description Derived from title when omitted
@@ -297,18 +492,23 @@ export interface components {
             tags: string[];
             /** Title */
             title: string;
+            /**
+             * Visibility
+             * @default shared
+             * @enum {string}
+             */
+            visibility: "shared" | "private" | "restricted";
         };
         /**
          * EditMemoryRequest
-         * @description Sparse edit; omitted fields stay unchanged.
+         * @description Sparse narrative edit; omitted fields stay unchanged. ``kind`` is immutable —
+         *     structured fields go through the attributes endpoint.
          */
         EditMemoryRequest: {
             /** Content */
             content?: string | null;
             /** Expected Version */
             expected_version: number;
-            /** Memory Type */
-            memory_type?: ("fact" | "preference" | "project" | "reference" | "episodic") | null;
             /** Slug */
             slug?: string | null;
             /** Title */
@@ -347,6 +547,22 @@ export interface components {
             /** Stream Seq */
             stream_seq: number;
         };
+        /** EvidenceView */
+        EvidenceView: {
+            /** Actor */
+            actor?: string | null;
+            /** Added At */
+            added_at?: string | null;
+            /**
+             * Evidence Type
+             * @enum {string}
+             */
+            evidence_type: "quote" | "uri" | "conversation" | "document" | "observation";
+            /** Note */
+            note?: string | null;
+            /** Value */
+            value: string;
+        };
         /** HealthResponse */
         HealthResponse: {
             /**
@@ -361,7 +577,7 @@ export interface components {
              * Relation
              * @enum {string}
              */
-            relation: "relates_to" | "supersedes" | "derived_from" | "contradicts";
+            relation: "about" | "involves" | "part_of" | "owned_by" | "works_at" | "located_in" | "relates_to" | "supersedes" | "derived_from" | "contradicts";
             /**
              * Target Id
              * Format: uuid
@@ -379,7 +595,19 @@ export interface components {
         MemoryResponse: {
             /** Archived */
             archived: boolean;
-            /** Content */
+            /**
+             * Attributes
+             * @description Kind-schema fields, validated on write (see docs/memory-model.md §2)
+             */
+            attributes: {
+                [key: string]: unknown;
+            };
+            /** Confidence */
+            confidence: number;
+            /**
+             * Content
+             * @description Narrative markdown; attributes are the queryable truth
+             */
             content: string;
             /**
              * Created At
@@ -387,19 +615,42 @@ export interface components {
              */
             created_at: string;
             /**
+             * Effective Confidence
+             * @description Confidence after time decay
+             */
+            effective_confidence: number;
+            /** Evidence */
+            evidence: components["schemas"]["EvidenceView"][];
+            /**
              * Id
              * Format: uuid
              */
             id: string;
-            /** Links */
-            links: components["schemas"]["LinkView"][];
             /**
-             * Memory Type
+             * Kind
              * @enum {string}
              */
-            memory_type: "fact" | "preference" | "project" | "reference" | "episodic";
+            kind: "fact" | "preference" | "person" | "organization" | "project" | "skill" | "goal" | "contact" | "event" | "location" | "asset" | "relationship";
+            /** Last Confirmed At */
+            last_confirmed_at: string | null;
+            /**
+             * Lifetime Policy
+             * @enum {string}
+             */
+            lifetime_policy: "permanent" | "standard" | "until" | "ephemeral";
+            /** Lifetime Until */
+            lifetime_until: string | null;
+            /** Links */
+            links: components["schemas"]["LinkView"][];
+            /** Pinned */
+            pinned: boolean;
             /** Slug */
             slug: string;
+            /**
+             * Stale
+             * @description Derived: effective confidence below the kind threshold
+             */
+            stale: boolean;
             /** Tags */
             tags: string[];
             /** Title */
@@ -409,11 +660,18 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** User Weight */
+            user_weight?: number | null;
             /**
              * Version
              * @description Optimistic concurrency token; echo it in edits
              */
             version: number;
+            /**
+             * Visibility
+             * @enum {string}
+             */
+            visibility: "shared" | "private" | "restricted";
         };
         /** OpenProposalRequest */
         OpenProposalRequest: {
@@ -516,6 +774,33 @@ export interface components {
             /** Query */
             query: string;
         };
+        /** SetLifetimeRequest */
+        SetLifetimeRequest: {
+            /**
+             * Lifetime Policy
+             * @enum {string}
+             */
+            lifetime_policy: "permanent" | "standard" | "until" | "ephemeral";
+            /**
+             * Lifetime Until
+             * @description Required iff policy is 'until'
+             */
+            lifetime_until?: string | null;
+        };
+        /** SetVisibilityRequest */
+        SetVisibilityRequest: {
+            /**
+             * Allowed Actors
+             * @description Required (non-empty) iff visibility is 'restricted'
+             * @default []
+             */
+            allowed_actors: string[];
+            /**
+             * Visibility
+             * @enum {string}
+             */
+            visibility: "shared" | "private" | "restricted";
+        };
         /** TimelineEntryResponse */
         TimelineEntryResponse: {
             /** Actor */
@@ -544,6 +829,18 @@ export interface components {
              * Format: uuid
              */
             memory_id: string;
+        };
+        /** UpdateAttributesRequest */
+        UpdateAttributesRequest: {
+            /**
+             * Changes
+             * @description Sparse kind-schema field changes
+             */
+            changes: {
+                [key: string]: unknown;
+            };
+            /** Expected Version */
+            expected_version: number;
         };
         /** VersionResponse */
         VersionResponse: {
@@ -644,9 +941,10 @@ export interface operations {
     list_memories_api_v1_memories_get: {
         parameters: {
             query?: {
-                memory_type?: ("fact" | "preference" | "project" | "reference" | "episodic") | null;
+                kind?: ("fact" | "preference" | "person" | "organization" | "project" | "skill" | "goal" | "contact" | "event" | "location" | "asset" | "relationship") | null;
                 tag?: string | null;
                 include_archived?: boolean;
+                include_stale?: boolean;
                 cursor?: string | null;
                 limit?: number;
             };
@@ -849,6 +1147,270 @@ export interface operations {
             };
         };
     };
+    update_attributes_api_v1_memories__memory_id__attributes_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAttributesRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryResponse"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    confirm_memory_api_v1_memories__memory_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryResponse"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    contradict_memory_api_v1_memories__memory_id__contradict_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContradictRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryResponse"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    add_evidence_api_v1_memories__memory_id__evidence_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddEvidenceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryResponse"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    adjust_importance_api_v1_memories__memory_id__importance_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdjustImportanceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryResponse"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    set_lifetime_api_v1_memories__memory_id__lifetime_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetLifetimeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryResponse"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     memory_timeline_api_v1_memories__memory_id__timeline_get: {
         parameters: {
             query?: never;
@@ -899,6 +1461,50 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryResponse"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    set_visibility_api_v1_memories__memory_id__visibility_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetVisibilityRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -1141,7 +1747,7 @@ export interface operations {
         parameters: {
             query: {
                 q: string;
-                memory_type?: ("fact" | "preference" | "project" | "reference" | "episodic") | null;
+                kind?: ("fact" | "preference" | "person" | "organization" | "project" | "skill" | "goal" | "contact" | "event" | "location" | "asset" | "relationship") | null;
                 tag?: string | null;
                 limit?: number;
             };

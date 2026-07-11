@@ -1,7 +1,7 @@
 """On-disk layout of the export repository.
 
     <export-repo>/
-    ├── memories/<type>/<slug>.md      # one file per live memory (frontmatter + body)
+    ├── memories/<kind>/<slug>.md      # one file per live memory (frontmatter + body)
     ├── .engram/
     │   ├── events/<yyyy>-<mm>.ndjson  # append-only event export, month-sharded
     │   └── manifest.json              # uuid -> path map + last exported global_seq
@@ -15,7 +15,7 @@ this module still asserts the resolved path stays inside the repo root.
 from pathlib import Path, PurePosixPath
 
 from engram_core.domain.errors import ValidationError
-from engram_core.domain.values import MemoryType, Slug
+from engram_core.domain.values import MemoryKind, Slug
 
 MEMORIES_DIR = PurePosixPath("memories")
 ENGRAM_DIR = PurePosixPath(".engram")
@@ -23,9 +23,9 @@ EVENTS_DIR = ENGRAM_DIR / "events"
 MANIFEST_PATH = ENGRAM_DIR / "manifest.json"
 
 
-def memory_relpath(memory_type: MemoryType, slug: Slug) -> PurePosixPath:
+def memory_relpath(kind: MemoryKind, slug: Slug) -> PurePosixPath:
     """Relative path of a memory's markdown file inside the export repo."""
-    return MEMORIES_DIR / memory_type.value / f"{slug}.md"
+    return MEMORIES_DIR / kind.value / f"{slug}.md"
 
 
 def resolve_inside(repo_root: Path, relpath: PurePosixPath) -> Path:

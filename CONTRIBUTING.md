@@ -48,6 +48,26 @@ Useful commands (run from the repo root):
 5. Never change a shipped payload shape in place — bump `schema_version` and add an
    upcaster. Old logs must replay forever.
 
+## How to add or evolve a memory kind
+
+Kinds are versioned schemas, not aggregates (ADR-0008, docs/memory-model.md):
+
+1. Add/extend the frozen attributes dataclass in
+   `libs/engram-core/src/engram_core/domain/kinds.py`. Closed vocabularies are
+   `StrEnum`s.
+2. Never change a shipped shape in place — bump the kind's `schema_version` in
+   `build_kind_registry()` and register an upcaster.
+3. Add the kind's half-life and staleness threshold to `domain/scoring.py`
+   (a test fails if you forget).
+4. Add the per-kind SQL view / expression index in the storage projection, and the
+   kind name to the API's `MemoryKindName` literal.
+5. New kinds and vocabulary changes need an ADR — the model doc calls the data model
+   stable for a reason.
+
+Edges vs. reified relationships (ADR-0010): if a connection could ever need
+confirming, contradicting, or dating, make it a `relationship` memory; otherwise use
+a tier-1 `Link` from the closed relation vocabulary.
+
 ## How to add a projection
 
 Implement the `Projection` protocol from `engram_events` (`handles`, `apply`, checkpoint

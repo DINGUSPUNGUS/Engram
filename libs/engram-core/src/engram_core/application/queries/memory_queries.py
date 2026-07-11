@@ -2,7 +2,7 @@
 
 from engram_core.application.dto import MemoryReadModel, Page
 from engram_core.domain.ports import MemoryQuery
-from engram_core.domain.values import MemoryId, MemoryType
+from engram_core.domain.values import MemoryId, MemoryKind
 
 
 class MemoryQueryService:
@@ -22,11 +22,13 @@ class MemoryQueryService:
     def list_memories(
         self,
         *,
-        memory_type: MemoryType | None = None,
+        kind: MemoryKind | None = None,
         tag: str | None = None,
         include_archived: bool = False,
+        include_stale: bool = True,
         cursor: str | None = None,
         limit: int = 50,
     ) -> Page[MemoryReadModel]:
-        """Cursor-paginated listing with optional filters."""
+        """Cursor-paginated listing with optional filters. Visibility is enforced
+        here — the caller's principal decides what may be returned."""
         raise NotImplementedError

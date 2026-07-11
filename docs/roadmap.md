@@ -3,16 +3,25 @@
 Phases are strictly ordered by dependency, not priority — each one stands on the previous.
 "Done" always includes tests, docs, and the invariants listed.
 
-## Phase 0 — Architecture skeleton ✅ (this repo)
+## Phase 0 — Architecture skeleton ✅
 
 Monorepo, kernel contracts, domain/service stubs, initial schema + migrations, API/CLI
 shells, web scaffold, CI, docs, ADRs. Invariant established: layering is CI-enforced.
 
+## Phase 0.5 — Memory model & knowledge graph design ✅
+
+[memory-model.md](memory-model.md): twelve typed kinds over one aggregate (ADR-0008),
+the justification spine (ADR-0009), two-tier graph semantics (ADR-0010), lifecycle +
+pruning-via-proposals (ADR-0011), confidence and decay models, conflict resolution,
+entity resolution. Skeleton rebound to the model: kind schemas + KindRegistry, spine
+values, extended event taxonomy, spine-carrying storage schema and API contracts.
+Invariant established: the data model is stable before feature code exists.
+
 ## Phase 1 — The event core
 
-SQLite event store (append, optimistic concurrency, read), Memory aggregate fold/decide,
-memory command/query services, state projection, `engram init/add/list/show`.
-Invariant: replay determinism test green.
+SQLite event store (append, optimistic concurrency, read), Memory aggregate fold/decide
+(kind-schema validation via KindRegistry), memory command/query services, state
+projection, `engram init/add/list/show`. Invariant: replay determinism test green.
 
 ## Phase 2 — Search & rebuild
 

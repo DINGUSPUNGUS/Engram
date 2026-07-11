@@ -2,41 +2,60 @@
 
 Rules (ADR-0002):
 - Payloads are frozen dataclasses with JSON-compatible-ish fields (UUIDs and
-  datetimes are encoded/decoded by the event store adapter).
+  datetimes are encoded/decoded by the event store adapter). Kind attributes travel
+  as plain dicts in payloads; the aggregate validates them against the KindRegistry
+  *before* emitting (ADR-0008).
 - A shipped payload shape is never changed in place. Evolve by bumping the
   ``schema_version`` in :func:`build_registry` and registering an upcaster so
   historical logs replay forever.
 - Naming: ``<Noun><PastTenseVerb>`` — events are facts, not commands.
+
+The full taxonomy is documented in docs/events.md and docs/memory-model.md §10.
 """
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from uuid import UUID
 
 from engram_events import EventRegistry
 
 # ---------------------------------------------------------------------------
-# Memory events
+# Memory events — creation & content
 # ---------------------------------------------------------------------------
 
 
 @dataclass(frozen=True, slots=True)
 class MemoryCreated:
     memory_id: UUID
+    kind: str
     slug: str
     title: str
     content: str
-    memory_type: str
+    attributes: dict[str, object]
+    attributes_schema_version: int = 1
     tags: tuple[str, ...] = ()
+    confidence: float = 0.6
+    lifetime_policy: str = "standard"
+    lifetime_until: datetime | None = None
+    visibility: str = "shared"
 
 
 @dataclass(frozen=True, slots=True)
 class MemoryEdited:
-    """A content-level change. ``None`` means "unchanged"."""
+    """A narrative-level change. ``None`` means "unchanged". ``kind`` is immutable —
+    structured fields change via ``MemoryAttributesUpdated``."""
 
     title: str | None = None
     content: str | None = None
     slug: str | None = None
-    memory_type: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class MemoryAttributesUpdated:
+    """Sparse change to kind-schema fields, validated against the KindRegistry."""
+
+    changes: dict[str, object]
+    attributes_schema_version: int = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +65,58 @@ class MemoryEditedExternally:
     title: str | None = None
     content: str | None = None
     source_path: str = ""
+
+
+# ---------------------------------------------------------------------------
+# Memory events — justification spine (memory-model.md §3, §5)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class MemoryConfirmed:
+    """Someone vouched for this memory: raises confidence, resets staleness."""
+
+    note: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class MemoryContradicted:
+    """Someone disputed this memory: lowers confidence, creates a contradicts edge."""
+
+    contradicting_id: UUID | None = None
+    note: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class MemoryEvidenceAdded:
+    evidence_type: str
+    value: str
+    note: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class MemoryImportanceAdjusted:
+    """Pin/unpin or set an explicit user weight. ``None`` means "unchanged"."""
+
+    pinned: bool | None = None
+    user_weight: float | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class MemoryVisibilityChanged:
+    visibility: str
+    allowed_actors: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class MemoryLifetimeChanged:
+    lifetime_policy: str
+    lifetime_until: datetime | None = None
+
+
+# ---------------------------------------------------------------------------
+# Memory events — organization & lifecycle
+# ---------------------------------------------------------------------------
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,7 +139,8 @@ class MemoryUnlinked:
 
 @dataclass(frozen=True, slots=True)
 class MemoryMerged:
-    """``source_id`` was merged into this memory (the survivor's stream)."""
+    """``source_id`` was merged into this memory (the survivor's stream).
+    Entity resolution lands here: alias sets union, edges re-point."""
 
     source_id: UUID
     merged_content: str
@@ -86,20 +158,21 @@ class MemoryRestored:
 
 @dataclass(frozen=True, slots=True)
 class MemoryDeleted:
-    """Tombstone. The stream stays in the log (append-only) but state hides it."""
+    """Tombstone. The stream stays in the log (append-only) but state hides it.
+    Never automated (ADR-0011)."""
 
     reason: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class MemoryAccessed:
-    """A consumer recalled this memory. Feeds future decay/salience scoring."""
+    """A consumer recalled this memory. Feeds retention scoring (ADR-0009)."""
 
     context: str | None = None
 
 
 # ---------------------------------------------------------------------------
-# Proposal events (PR-style approvals)
+# Proposal events (PR-style approvals; also the vehicle for pruning, ADR-0011)
 # ---------------------------------------------------------------------------
 
 
@@ -136,7 +209,14 @@ class ProposalMerged:
 _EVENT_TYPES: dict[str, type] = {
     "MemoryCreated": MemoryCreated,
     "MemoryEdited": MemoryEdited,
+    "MemoryAttributesUpdated": MemoryAttributesUpdated,
     "MemoryEditedExternally": MemoryEditedExternally,
+    "MemoryConfirmed": MemoryConfirmed,
+    "MemoryContradicted": MemoryContradicted,
+    "MemoryEvidenceAdded": MemoryEvidenceAdded,
+    "MemoryImportanceAdjusted": MemoryImportanceAdjusted,
+    "MemoryVisibilityChanged": MemoryVisibilityChanged,
+    "MemoryLifetimeChanged": MemoryLifetimeChanged,
     "MemoryTagged": MemoryTagged,
     "MemoryLinked": MemoryLinked,
     "MemoryUnlinked": MemoryUnlinked,

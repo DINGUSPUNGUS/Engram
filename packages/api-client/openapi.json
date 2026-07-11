@@ -1,16 +1,173 @@
 {
   "components": {
     "schemas": {
+      "AddEvidenceRequest": {
+        "properties": {
+          "evidence_type": {
+            "enum": ["quote", "uri", "conversation", "document", "observation"],
+            "title": "Evidence Type",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "value": {
+            "minLength": 1,
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": ["evidence_type", "value"],
+        "title": "AddEvidenceRequest",
+        "type": "object"
+      },
+      "AdjustImportanceRequest": {
+        "properties": {
+          "pinned": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pinned"
+          },
+          "user_weight": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Weight"
+          }
+        },
+        "title": "AdjustImportanceRequest",
+        "type": "object"
+      },
+      "ConfirmRequest": {
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "title": "ConfirmRequest",
+        "type": "object"
+      },
+      "ContradictRequest": {
+        "properties": {
+          "contradicting_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contradicting Id"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "title": "ContradictRequest",
+        "type": "object"
+      },
       "CreateMemoryRequest": {
         "properties": {
+          "attributes": {
+            "additionalProperties": true,
+            "default": {},
+            "description": "Must satisfy the kind schema",
+            "title": "Attributes",
+            "type": "object"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Omit to apply the source prior",
+            "title": "Confidence"
+          },
           "content": {
+            "default": "",
             "title": "Content",
             "type": "string"
           },
-          "memory_type": {
-            "enum": ["fact", "preference", "project", "reference", "episodic"],
-            "title": "Memory Type",
+          "kind": {
+            "enum": [
+              "fact",
+              "preference",
+              "person",
+              "organization",
+              "project",
+              "skill",
+              "goal",
+              "contact",
+              "event",
+              "location",
+              "asset",
+              "relationship"
+            ],
+            "title": "Kind",
             "type": "string"
+          },
+          "lifetime_policy": {
+            "default": "standard",
+            "enum": ["permanent", "standard", "until", "ephemeral"],
+            "title": "Lifetime Policy",
+            "type": "string"
+          },
+          "lifetime_until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lifetime Until"
           },
           "slug": {
             "anyOf": [
@@ -37,14 +194,20 @@
             "minLength": 1,
             "title": "Title",
             "type": "string"
+          },
+          "visibility": {
+            "default": "shared",
+            "enum": ["shared", "private", "restricted"],
+            "title": "Visibility",
+            "type": "string"
           }
         },
-        "required": ["title", "content", "memory_type"],
+        "required": ["kind", "title"],
         "title": "CreateMemoryRequest",
         "type": "object"
       },
       "EditMemoryRequest": {
-        "description": "Sparse edit; omitted fields stay unchanged.",
+        "description": "Sparse narrative edit; omitted fields stay unchanged. ``kind`` is immutable \u2014\nstructured fields go through the attributes endpoint.",
         "properties": {
           "content": {
             "anyOf": [
@@ -61,18 +224,6 @@
             "minimum": 1.0,
             "title": "Expected Version",
             "type": "integer"
-          },
-          "memory_type": {
-            "anyOf": [
-              {
-                "enum": ["fact", "preference", "project", "reference", "episodic"],
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Memory Type"
           },
           "slug": {
             "anyOf": [
@@ -172,6 +323,56 @@
         "title": "EventResponse",
         "type": "object"
       },
+      "EvidenceView": {
+        "properties": {
+          "actor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor"
+          },
+          "added_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Added At"
+          },
+          "evidence_type": {
+            "enum": ["quote", "uri", "conversation", "document", "observation"],
+            "title": "Evidence Type",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": ["evidence_type", "value"],
+        "title": "EvidenceView",
+        "type": "object"
+      },
       "HealthResponse": {
         "properties": {
           "status": {
@@ -186,7 +387,18 @@
       "LinkView": {
         "properties": {
           "relation": {
-            "enum": ["relates_to", "supersedes", "derived_from", "contradicts"],
+            "enum": [
+              "about",
+              "involves",
+              "part_of",
+              "owned_by",
+              "works_at",
+              "located_in",
+              "relates_to",
+              "supersedes",
+              "derived_from",
+              "contradicts"
+            ],
             "title": "Relation",
             "type": "string"
           },
@@ -231,7 +443,20 @@
             "title": "Archived",
             "type": "boolean"
           },
+          "attributes": {
+            "additionalProperties": true,
+            "description": "Kind-schema fields, validated on write (see docs/memory-model.md \u00a72)",
+            "title": "Attributes",
+            "type": "object"
+          },
+          "confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
           "content": {
+            "description": "Narrative markdown; attributes are the queryable truth",
             "title": "Content",
             "type": "string"
           },
@@ -240,10 +465,71 @@
             "title": "Created At",
             "type": "string"
           },
+          "effective_confidence": {
+            "description": "Confidence after time decay",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Effective Confidence",
+            "type": "number"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceView"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "fact",
+              "preference",
+              "person",
+              "organization",
+              "project",
+              "skill",
+              "goal",
+              "contact",
+              "event",
+              "location",
+              "asset",
+              "relationship"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "last_confirmed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Confirmed At"
+          },
+          "lifetime_policy": {
+            "enum": ["permanent", "standard", "until", "ephemeral"],
+            "title": "Lifetime Policy",
+            "type": "string"
+          },
+          "lifetime_until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lifetime Until"
           },
           "links": {
             "items": {
@@ -252,14 +538,18 @@
             "title": "Links",
             "type": "array"
           },
-          "memory_type": {
-            "enum": ["fact", "preference", "project", "reference", "episodic"],
-            "title": "Memory Type",
-            "type": "string"
+          "pinned": {
+            "title": "Pinned",
+            "type": "boolean"
           },
           "slug": {
             "title": "Slug",
             "type": "string"
+          },
+          "stale": {
+            "description": "Derived: effective confidence below the kind threshold",
+            "title": "Stale",
+            "type": "boolean"
           },
           "tags": {
             "items": {
@@ -277,20 +567,48 @@
             "title": "Updated At",
             "type": "string"
           },
+          "user_weight": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Weight"
+          },
           "version": {
             "description": "Optimistic concurrency token; echo it in edits",
             "title": "Version",
             "type": "integer"
+          },
+          "visibility": {
+            "enum": ["shared", "private", "restricted"],
+            "title": "Visibility",
+            "type": "string"
           }
         },
         "required": [
           "id",
+          "kind",
           "slug",
           "title",
           "content",
-          "memory_type",
+          "attributes",
           "tags",
           "links",
+          "evidence",
+          "confidence",
+          "effective_confidence",
+          "stale",
+          "last_confirmed_at",
+          "lifetime_policy",
+          "lifetime_until",
+          "visibility",
+          "pinned",
           "archived",
           "created_at",
           "updated_at",
@@ -504,6 +822,52 @@
         "title": "SearchResponse",
         "type": "object"
       },
+      "SetLifetimeRequest": {
+        "properties": {
+          "lifetime_policy": {
+            "enum": ["permanent", "standard", "until", "ephemeral"],
+            "title": "Lifetime Policy",
+            "type": "string"
+          },
+          "lifetime_until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Required iff policy is 'until'",
+            "title": "Lifetime Until"
+          }
+        },
+        "required": ["lifetime_policy"],
+        "title": "SetLifetimeRequest",
+        "type": "object"
+      },
+      "SetVisibilityRequest": {
+        "properties": {
+          "allowed_actors": {
+            "default": [],
+            "description": "Required (non-empty) iff visibility is 'restricted'",
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Actors",
+            "type": "array"
+          },
+          "visibility": {
+            "enum": ["shared", "private", "restricted"],
+            "title": "Visibility",
+            "type": "string"
+          }
+        },
+        "required": ["visibility"],
+        "title": "SetVisibilityRequest",
+        "type": "object"
+      },
       "TimelineEntryResponse": {
         "properties": {
           "actor": {
@@ -550,6 +914,24 @@
         },
         "required": ["memory_id", "entries"],
         "title": "TimelineResponse",
+        "type": "object"
+      },
+      "UpdateAttributesRequest": {
+        "properties": {
+          "changes": {
+            "additionalProperties": true,
+            "description": "Sparse kind-schema field changes",
+            "title": "Changes",
+            "type": "object"
+          },
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          }
+        },
+        "required": ["expected_version", "changes"],
+        "title": "UpdateAttributesRequest",
         "type": "object"
       },
       "VersionResponse": {
@@ -685,24 +1067,37 @@
     },
     "/api/v1/memories": {
       "get": {
-        "description": "Cursor-paginated listing of current memory state.",
+        "description": "Cursor-paginated listing. Visibility is enforced against the principal.",
         "operationId": "list_memories_api_v1_memories_get",
         "parameters": [
           {
             "in": "query",
-            "name": "memory_type",
+            "name": "kind",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "enum": ["fact", "preference", "project", "reference", "episodic"],
+                  "enum": [
+                    "fact",
+                    "preference",
+                    "person",
+                    "organization",
+                    "project",
+                    "skill",
+                    "goal",
+                    "contact",
+                    "event",
+                    "location",
+                    "asset",
+                    "relationship"
+                  ],
                   "type": "string"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "title": "Memory Type"
+              "title": "Kind"
             }
           },
           {
@@ -728,6 +1123,16 @@
             "schema": {
               "default": false,
               "title": "Include Archived",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_stale",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Include Stale",
               "type": "boolean"
             }
           },
@@ -796,7 +1201,7 @@
         "tags": ["memories"]
       },
       "post": {
-        "description": "Create a memory; returns its immutable id and initial state.",
+        "description": "Create a typed memory; attributes must satisfy the kind schema (422 otherwise).",
         "operationId": "create_memory_api_v1_memories_post",
         "requestBody": {
           "content": {
@@ -889,7 +1294,7 @@
         "tags": ["memories"]
       },
       "get": {
-        "description": "Current state of one memory.",
+        "description": "Current state of one memory, spine included.",
         "operationId": "get_memory_api_v1_memories__memory_id__get",
         "parameters": [
           {
@@ -939,7 +1344,7 @@
         "tags": ["memories"]
       },
       "patch": {
-        "description": "Sparse edit. 409 when ``expected_version`` is stale.",
+        "description": "Sparse narrative edit (title/content/slug). 409 when ``expected_version`` is stale.",
         "operationId": "edit_memory_api_v1_memories__memory_id__patch",
         "parameters": [
           {
@@ -996,6 +1401,378 @@
           }
         },
         "summary": "Edit Memory",
+        "tags": ["memories"]
+      }
+    },
+    "/api/v1/memories/{memory_id}/attributes": {
+      "patch": {
+        "description": "Sparse change to kind-schema fields; validated against the KindRegistry.",
+        "operationId": "update_attributes_api_v1_memories__memory_id__attributes_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memory_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Memory Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAttributesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          },
+          "5XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Update Attributes",
+        "tags": ["memories"]
+      }
+    },
+    "/api/v1/memories/{memory_id}/confirm": {
+      "post": {
+        "description": "Vouch for a memory: raises confidence, resets staleness.",
+        "operationId": "confirm_memory_api_v1_memories__memory_id__confirm_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memory_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Memory Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          },
+          "5XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Confirm Memory",
+        "tags": ["memories"]
+      }
+    },
+    "/api/v1/memories/{memory_id}/contradict": {
+      "post": {
+        "description": "Dispute a memory: lowers confidence, creates a ``contradicts`` edge.",
+        "operationId": "contradict_memory_api_v1_memories__memory_id__contradict_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memory_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Memory Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContradictRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          },
+          "5XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Contradict Memory",
+        "tags": ["memories"]
+      }
+    },
+    "/api/v1/memories/{memory_id}/evidence": {
+      "post": {
+        "description": "Append supporting evidence (append-only).",
+        "operationId": "add_evidence_api_v1_memories__memory_id__evidence_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memory_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Memory Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddEvidenceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          },
+          "5XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Add Evidence",
+        "tags": ["memories"]
+      }
+    },
+    "/api/v1/memories/{memory_id}/importance": {
+      "patch": {
+        "description": "Pin/unpin or set the explicit user weight.",
+        "operationId": "adjust_importance_api_v1_memories__memory_id__importance_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memory_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Memory Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdjustImportanceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          },
+          "5XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Adjust Importance",
+        "tags": ["memories"]
+      }
+    },
+    "/api/v1/memories/{memory_id}/lifetime": {
+      "patch": {
+        "description": "Change the retention policy.",
+        "operationId": "set_lifetime_api_v1_memories__memory_id__lifetime_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memory_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Memory Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetLifetimeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          },
+          "5XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Set Lifetime",
         "tags": ["memories"]
       }
     },
@@ -1100,6 +1877,68 @@
           }
         },
         "summary": "Undo Last Change",
+        "tags": ["memories"]
+      }
+    },
+    "/api/v1/memories/{memory_id}/visibility": {
+      "patch": {
+        "description": "Change who may recall this memory.",
+        "operationId": "set_visibility_api_v1_memories__memory_id__visibility_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memory_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Memory Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetVisibilityRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          },
+          "5XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Set Visibility",
         "tags": ["memories"]
       }
     },
@@ -1382,19 +2221,32 @@
           },
           {
             "in": "query",
-            "name": "memory_type",
+            "name": "kind",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "enum": ["fact", "preference", "project", "reference", "episodic"],
+                  "enum": [
+                    "fact",
+                    "preference",
+                    "person",
+                    "organization",
+                    "project",
+                    "skill",
+                    "goal",
+                    "contact",
+                    "event",
+                    "location",
+                    "asset",
+                    "relationship"
+                  ],
                   "type": "string"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "title": "Memory Type"
+              "title": "Kind"
             }
           },
           {

@@ -1,69 +1,68 @@
 # Domain Model
 
-Domain-driven, event-sourced. Aggregates validate commands and emit events; state is a
-fold over the stream. Code of record: `libs/engram-core/src/engram_core/domain/`.
+> **The model of record is [memory-model.md](memory-model.md)** — the twelve kinds, the
+> justification spine, lifecycle, confidence, decay, conflict resolution, and graph
+> semantics all live there. This document covers the *mechanics*: how the model is
+> realized as aggregates, values, and ports. Code of record:
+> `libs/engram-core/src/engram_core/domain/`.
 
 ## MemorySpace
 
 One user-owned memory set: an event log, its projections, and an export repository. The
-consistency boundary — everything below lives inside one space. Multi-space (work vs
-personal) and multi-user workspaces are roadmap items; nothing in the model assumes a
-single space, only a single space *per store*.
+consistency boundary — everything below lives inside one space.
 
-## Memory (aggregate root)
+## Memory (the one aggregate, ADR-0008)
 
-| Field | Type | Notes |
-| --- | --- | --- |
-| `id` | `MemoryId` (UUIDv7) | Immutable identity (ADR-0003). Time-ordered for index locality. |
-| `slug` | `Slug` | Mutable, human-friendly handle. `^[a-z0-9]+(-[a-z0-9]+)*$`, ≤ 80 chars — the constrained alphabet doubles as the exporter's path-traversal guard. |
-| `title`, `content` | `str` | Content is markdown. |
-| `memory_type` | `MemoryType` | `fact · preference · project · reference · episodic` — also the export directory. |
-| `tags` | `frozenset[str]` | Normalized lowercase. |
-| `links` | `tuple[Link, ...]` | Typed directed edges (below). |
-| `salience` | `Salience` | created / last-accessed / access-count. **Inputs only** — the decay algorithm is roadmap phase 8 and can be computed retroactively from `MemoryAccessed` events. |
-| `archived`, `deleted` | `bool` | Soft states. Deleted = tombstoned; the stream persists. |
-| `version` | `int` | Last applied `stream_seq`; the optimistic-concurrency token. |
+Owns the mechanism for all twelve kinds: identity (`MemoryId`, UUIDv7, immutable),
+event stream, narrative fields (`slug`/`title`/`content`), typed `attributes`
+(validated via the `KindRegistry`), the justification spine (`confidence`,
+`last_confirmed_at`, `evidence`, `importance` signals, `lifetime`, `visibility`),
+tier-1 `links`, lifecycle flags, and `version` (optimistic-concurrency token).
 
-Commands (`decide_*`) → events: create, edit, tag, link, merge_from, archive, delete,
-record_access. Reconstruction: `fold`/`evolve` (pure).
+- Reconstruction: `fold` / `evolve` — pure functions over the stream.
+- Commands: `decide_create`, `decide_edit` (narrative), `decide_update_attributes`
+  (kind schema), spine commands (`decide_confirm`, `decide_contradict`,
+  `decide_add_evidence`, `decide_adjust_importance`, `decide_set_visibility`,
+  `decide_set_lifetime`), organization (`decide_tag`, `decide_link`,
+  `decide_merge_from`), lifecycle (`decide_archive/restore/delete`,
+  `decide_record_access`).
+- Staleness is **not** a field: it is derived by the scoring projection
+  (effective confidence below the kind threshold, memory-model.md §5).
 
-## Link
+## Kind schemas (`domain/kinds.py`)
 
-`(target_id, relation)` where relation ∈ `relates_to · supersedes · derived_from ·
-contradicts`. Stored on the source memory's stream (`MemoryLinked`), materialized into the
-`links` projection table for graph traversal. `supersedes` and `contradicts` are the
-hooks for future dedup/consistency tooling.
+Twelve frozen dataclasses (`FactAttributes` … `RelationshipAttributes`) with closed
+`StrEnum` vocabularies, registered in the `KindRegistry` with `schema_version` and
+upcasters — the same evolution discipline as events. `build_kind_registry()` is the
+canonical registration, mirrored by `build_registry()` for events.
 
-## Proposal (aggregate root)
+## Proposal (aggregate)
 
-PR-style review for memory changes — how automatic memory extraction stays trustworthy:
-an assistant proposes, the user approves.
+PR-style review: draft events targeting memory streams, status
+`draft → pending → approved/rejected`, `approved → merged`. Merge re-validates against
+current target streams; a moved target is `StaleVersionError` (409), never a silent
+overwrite. Proposals are also the vehicle for automatic pruning (ADR-0011) and, later,
+memory extraction — automation proposes, events decide.
 
-| Field | Notes |
-| --- | --- |
-| `id` | `ProposalId` (UUIDv7) |
-| `title`, `description` | Reviewer-facing. |
-| `status` | `draft → pending → approved/rejected`, `approved → merged`. |
-| `proposed_events` | Serialized envelopes targeting memory streams. They do not touch target streams until merge. |
-| `review_note` | Free text from the reviewer. |
+## Values (`domain/values.py`)
 
-Merge re-validates proposed events against the *current* target streams; a moved target is
-a conflict (`StaleVersionError` → HTTP 409), never a silent overwrite.
+`MemoryId`/`ProposalId` (UUIDv7 NewTypes) · `Slug` (constrained alphabet = traversal
+guard) · `MemoryKind` (12) · `LinkRelation` (10, closed) · `Link` · `EvidenceRef` +
+`EvidenceType` · `Lifetime` + `RetentionPolicy` · `Visibility` · `ImportanceSignals` ·
+`validate_confidence`. All frozen, all validated at construction.
 
-## Value objects
+## Tunables (`domain/scoring.py`)
 
-`MemoryId`, `ProposalId` (NewType over UUID), `Slug`, `MemoryType`, `LinkRelation`,
-`Salience` — all frozen, all validated at construction (`ValidationError`).
-`Provenance` (kernel): `actor` + optional `session_id`/`detail`; every event carries one.
+Confidence priors, confirm/contradict weights, per-kind half-lives and staleness
+thresholds, retention weights, pruning threshold (ADR-0009: constants in one module,
+scores derived in projections, retunable via `engram rebuild`).
 
 ## Ports (what the domain needs from the world)
-
-Defined in `ports.py`, implemented by adapters, wired in app composition roots:
 
 | Port | Side | Canonical adapter |
 | --- | --- | --- |
 | `MemoryRepository`, `ProposalRepository` | write | engram-storage-sqlite |
-| `MemoryQuery` | read | engram-storage-sqlite |
+| `MemoryQuery` (kind/tag/stale filters, visibility-enforced) | read | engram-storage-sqlite |
 | `SearchIndex` (`supports_vectors` capability flag) | read | engram-storage-sqlite (FTS later, vec later) |
 | `EmbeddingProvider` | — | none (interface reserved; roadmap phase 6) |
 | `MarkdownSync`, `VersionControl` | export | engram-export-git |

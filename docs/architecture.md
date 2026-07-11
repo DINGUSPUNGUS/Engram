@@ -4,6 +4,8 @@ This is the master architecture document. It covers the whole system at survey d
 links to focused documents for detail. If you change something this document contradicts,
 either your change or this document is wrong — fix whichever it is in the same PR.
 
+- **[The Memory Model](memory-model.md)** — the most load-bearing document: twelve typed
+  kinds, the justification spine, lifecycle, decay, conflicts, graph semantics
 - [Domain model](domain-model.md) · [Events](events.md) · [Data flow](data-flow.md)
 - [REST API](api.md) · [Conventions](conventions.md) · [Operations](operations.md)
 - [Security](security.md) · [Roadmap](roadmap.md) · [Decisions (ADRs)](adr/)
@@ -134,11 +136,14 @@ synchronous queries against projections.
 
 ## 6. Domain model
 
-See [domain-model.md](domain-model.md). Aggregates: **Memory** (event-sourced; slug,
-title, content, type, tags, typed links, salience inputs, archived/deleted, version) and
-**Proposal** (PR-style change set with draft events and review lifecycle). Value objects:
-`MemoryId`/`ProposalId` (UUIDv7), `Slug`, `MemoryType`, `LinkRelation`, `Salience`,
-`Provenance`. The full event vocabulary lives in [events.md](events.md).
+The model of record is [memory-model.md](memory-model.md): memories are **typed
+objects** — twelve kinds (fact, preference, person, organization, project, skill, goal,
+contact, event, location, asset, relationship) realized as versioned attribute schemas
+over one event-sourced **Memory** aggregate (ADR-0008), each carrying the justification
+spine (source, evidence, confidence, importance, lifetime, visibility — ADR-0009).
+**Proposal** is the second aggregate: PR-style review, and the vehicle for pruning
+(ADR-0011) and future extraction. Mechanics in [domain-model.md](domain-model.md); the
+event vocabulary in [events.md](events.md).
 
 ## 7. API layout
 

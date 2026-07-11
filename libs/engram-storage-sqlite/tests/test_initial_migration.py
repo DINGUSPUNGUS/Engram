@@ -13,6 +13,7 @@ _PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_TABLES = {
     "events",
     "memories",
+    "evidence",
     "memory_tags",
     "links",
     "projection_checkpoints",
