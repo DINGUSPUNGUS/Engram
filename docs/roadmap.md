@@ -26,6 +26,11 @@ evaluation gate with golden sets, synthetic corpus taxonomy, and committed basel
 (ADR-0014). `libs/engram-intelligence` binds the contracts; `evaluations/` exists from
 day 0. Invariant established: no AI-affecting change merges below baseline.
 
+> **Architecture freeze (2026-07-12).** Phases 0–0.75 plus the observatory reservation
+> (ADR-0015) complete the design work. From here, new architectural ideas must earn
+> their place by solving a concrete problem discovered during implementation — not by
+> speculation.
+
 ## Phase 1 — The event core
 
 SQLite event store (append, optimistic concurrency, read), Memory aggregate fold/decide

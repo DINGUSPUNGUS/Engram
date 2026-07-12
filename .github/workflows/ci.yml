@@ -57,7 +57,7 @@ jobs:
           uv run mypy
           libs/engram-events/src libs/engram-core/src
           libs/engram-storage-sqlite/src libs/engram-export-git/src
-          libs/engram-intelligence/src
+          libs/engram-intelligence/src libs/engram-observatory/src
           apps/api/src apps/cli/src apps/mcp/src
       - name: Test (pytest)
         run: uv run pytest libs apps -ra

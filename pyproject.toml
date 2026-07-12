@@ -88,6 +88,7 @@ include_external_packages = true
 root_packages = [
     "engram_events",
     "engram_core",
+    "engram_observatory",
     "engram_storage_sqlite",
     "engram_export_git",
     "engram_intelligence",
@@ -101,6 +102,7 @@ type = "layers"
 layers = [
     "engram_api | engram_cli",
     "engram_storage_sqlite | engram_export_git | engram_intelligence",
+    "engram_observatory",
     "engram_core",
     "engram_events",
 ]

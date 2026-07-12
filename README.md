@@ -8,6 +8,14 @@ Claude, Gemini, Cursor, Copilot, Ollama, and anything else that speaks MCP or RE
 single persistent memory that *you* own — as an event log you can replay, a SQLite database
 you can query, and a git repository of markdown files you can read, grep, and take anywhere.
 
+Two principles govern everything here:
+
+1. **AI proposes; events decide.** No model is ever authoritative — automation can only
+   open proposals; only approved events change memory (ADR-0011/0012).
+2. **Boringly trustworthy.** Not flashy, not magical: every action is explainable,
+   reproducible, versioned, and reversible. If you ever wonder "why did it do that?",
+   the system can answer (ADR-0015).
+
 ## How it stores memory
 
 Three storage concerns, three canonical layers ([ADR-0001](docs/adr/0001-three-layer-storage.md)):
@@ -50,6 +58,7 @@ tables      later)                   │
 | `libs/engram-storage-sqlite` | Canonical store: SQLModel event store + state projections + Alembic migrations. |
 | `libs/engram-export-git` | Markdown/NDJSON export projector, git committer, inbound reconciler. |
 | `libs/engram-intelligence` | AI layer: ingestion pipeline contracts, LLM provider port (SDKs confined to `providers/`), versioned prompts, eval harness. |
+| `libs/engram-observatory` | Explainability: the audit graph answering "why did it do that?" (decision traces, not logs). |
 | `evaluations/` | Golden cases + synthetic corpus spec + the committed quality baseline. |
 | `apps/api` | FastAPI REST server (thin shell over application services). |
 | `apps/cli` | `engram` command-line interface (Typer). |

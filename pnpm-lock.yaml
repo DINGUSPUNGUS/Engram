@@ -93,6 +93,8 @@ importers:
 
   libs/engram-intelligence: {}
 
+  libs/engram-observatory: {}
+
   libs/engram-storage-sqlite: {}
 
   packages/api-client:

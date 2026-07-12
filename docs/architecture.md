@@ -88,8 +88,9 @@ engram/
 │   ├── engram-core/            Domain (aggregates, values, events, errors, ports) + application services
 │   ├── engram-storage-sqlite/  Canonical store: event log + state projections + Alembic
 │   ├── engram-export-git/      Markdown/NDJSON exporter, git committer, inbound reconciler
-│   └── engram-intelligence/    AI layer: ingestion pipeline contracts, LLM provider port,
-│                               versioned prompts, eval harness (SDKs confined to providers/)
+│   ├── engram-intelligence/    AI layer: ingestion pipeline contracts, LLM provider port,
+│   │                           versioned prompts, eval harness (SDKs confined to providers/)
+│   └── engram-observatory/     Explainability: decision traces (the audit graph, ADR-0015)
 ├── evaluations/    Golden cases, synthetic corpus spec, committed baseline (ADR-0014)
 ├── docs/           This documentation + ADRs
 ├── docker/         Optional container setup (local-first: not required)

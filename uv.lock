@@ -15,6 +15,7 @@ members = [
     "engram-export-git",
     "engram-intelligence",
     "engram-mcp",
+    "engram-observatory",
     "engram-storage-sqlite",
     "engram-workspace",
 ]
@@ -296,6 +297,21 @@ requires-dist = [
 name = "engram-mcp"
 version = "0.1.0"
 source = { editable = "apps/mcp" }
+dependencies = [
+    { name = "engram-core" },
+    { name = "engram-events" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "engram-core", editable = "libs/engram-core" },
+    { name = "engram-events", editable = "libs/engram-events" },
+]
+
+[[package]]
+name = "engram-observatory"
+version = "0.1.0"
+source = { editable = "libs/engram-observatory" }
 dependencies = [
     { name = "engram-core" },
     { name = "engram-events" },
