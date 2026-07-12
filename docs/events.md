@@ -58,6 +58,16 @@ Organization & lifecycle:
 `ProposalOpened` (with serialized draft envelopes), `ProposalApproved`,
 `ProposalRejected`, `ProposalMerged` (with the appended event ids).
 
+### Forward compatibility (accepted extension)
+
+Today the envelope carries `schema_version` (payload shape, upcast on read) and
+`stream_seq` (the aggregate's version). A third field, **`minimum_reader_version`**, is
+accepted-but-unimplemented: it will let a *newer* writer mark events that an *older*
+reader must refuse to fold, instead of misinterpreting them. It lands the first time we
+ship a change where old readers would be wrong rather than merely incomplete — per the
+architecture freeze, not before. Until then, the aggregate's rule ("unknown event types
+refuse to fold") is the backstop.
+
 ## Rules
 
 1. **Names are facts**: `<Noun><PastTenseVerb>`. Never commands (`CreateMemory` ❌).

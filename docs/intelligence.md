@@ -144,8 +144,8 @@ evaluations/
 ## 5. Synthetic test corpus
 
 Golden sets measure precision; the synthetic corpus measures behavior at scale.
-`evaluations/synthetic/scenarios.md` defines the taxonomy; a generator (roadmap
-phase 8, contract in `evals.py`) produces thousands of fake conversations per scenario,
+`evaluations/synthetic/scenarios.md` defines the taxonomy; a generator (milestone M5,
+contract in `evals.py`) produces thousands of fake conversations per scenario,
 with ground truth attached at generation time — so scoring is exact, not judged:
 
 | Scenario family | What it stresses |
@@ -165,7 +165,7 @@ without bloating the repo.
 ## 6. What Phase 0.75 deliberately does not do
 
 - No LLM calls, no SDK dependencies, no extraction logic — contracts, types, formats,
-  and the eval gate only. Implementation is roadmap phase 8, and it lands stage by
+  and the eval gate only. Implementation is milestone M5, and it lands stage by
   stage against these interfaces.
 - No streaming/agentic pipeline steps: `complete()` request/response is enough for
   every stage; revisit only with evidence.

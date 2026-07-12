@@ -364,7 +364,7 @@ export interface paths {
         };
         /**
          * Search
-         * @description FTS today, hybrid vector+FTS later — same endpoint, same shape.
+         * @description One language everywhere; FTS is one operator, vectors join it in M5.
          */
         get: operations["search_api_v1_search_get"];
         put?: never;
@@ -753,17 +753,21 @@ export interface components {
         };
         /** SearchHitResponse */
         SearchHitResponse: {
+            /** Effective Confidence */
+            effective_confidence: number;
+            /** Kind */
+            kind: string;
             /**
              * Memory Id
              * Format: uuid
              */
             memory_id: string;
             /** Score */
-            score: number;
+            score?: number | null;
             /** Slug */
             slug: string;
             /** Snippet */
-            snippet: string;
+            snippet?: string | null;
             /** Title */
             title: string;
         };
@@ -771,6 +775,8 @@ export interface components {
         SearchResponse: {
             /** Hits */
             hits: components["schemas"]["SearchHitResponse"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
             /** Query */
             query: string;
         };
@@ -1746,9 +1752,9 @@ export interface operations {
     search_api_v1_search_get: {
         parameters: {
             query: {
+                /** @description engram query language */
                 q: string;
-                kind?: ("fact" | "preference" | "person" | "organization" | "project" | "skill" | "goal" | "contact" | "event" | "location" | "asset" | "relationship") | null;
-                tag?: string | null;
+                cursor?: string | null;
                 limit?: number;
             };
             header?: never;

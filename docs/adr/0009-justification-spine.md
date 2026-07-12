@@ -32,7 +32,7 @@ boundary.
 
 - Decay/importance formulas can be tuned forever without corrupting history — the log
   never contains a number an algorithm made up. ✔
-- Retroactive scoring works: `MemoryAccessed` events from day 1 mean the phase-8 decay
+- Retroactive scoring works: `MemoryAccessed` events from day 1 mean the M5 decay
   model applies to the entire corpus the moment it ships. ✔
 - Confidence has exactly three movers: confirmation events, contradiction events, and
   time. No silent writes. ✔

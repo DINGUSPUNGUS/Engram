@@ -230,7 +230,7 @@ Conflict classes and default strategies (per-kind overrides in the same config t
 
 | Class | Detected by | Default resolution |
 | --- | --- | --- |
-| **Duplicate** (same real-world thing twice) | Entity resolution on alias/name/channel overlap (phase 8); manual merge anytime | `MemoryMerged` → survivor keeps id, source archived with `superseded_by` edge; alias sets union |
+| **Duplicate** (same real-world thing twice) | Entity resolution on alias/name/channel overlap (M5); manual merge anytime | `MemoryMerged` → survivor keeps id, source archived with `superseded_by` edge; alias sets union |
 | **Contradiction** (incompatible assertions) | `MemoryContradicted` (explicit, by assistant or user); attribute-equality checks on structured fields | Human review via conflict queue. Preferences with different `context` coexist; same context ⇒ newest proposed as superseding. Facts require confirmation to win. |
 | **Staleness** (probably outdated) | `c_eff` below threshold | Down-rank + confirmation request; unconfirmed ⇒ eligible for the pruning proposal |
 
@@ -244,7 +244,7 @@ winner.** Automation may *propose*; only confirmation/merge events *decide*.
 - Entity kinds (person, organization, location, asset) carry alias sets; resolution
   candidates come from alias/name/contact overlap. Resolution = `MemoryMerged` (§8):
   the survivor's stream absorbs meaning, the source stream survives as history.
-- A memory is *about* entities via `about` edges — extraction (phase 8) resolves mentions
+- A memory is *about* entities via `about` edges — extraction (M5) resolves mentions
   to entity ids or proposes new entities, always through Proposals.
 
 ## 10. Event taxonomy (delta over docs/events.md)
@@ -283,6 +283,6 @@ Archived/Restored, Deleted, Accessed — unchanged.)
 - No probabilistic truth maintenance beyond the single confidence scalar — a full
   belief-revision system is not worth its complexity here.
 - No user-defined kinds (yet): kind #13 is a PR with a schema + ADR, not runtime config.
-  Revisit when plugins land (roadmap phase 9).
+  Revisit when plugins land (milestone M8).
 - No cross-space references: a memory space is a hard boundary.
 - No automatic conflict *decisions*: automation proposes, events decide (§8).

@@ -32,7 +32,7 @@ from it and CI fails on drift.
 | `POST /api/v1/memories/{id}/undo` | Append the compensating event |
 | `GET /api/v1/proposals` · `POST /api/v1/proposals` | Review queue |
 | `POST /api/v1/proposals/{id}/approve·reject·merge` | Review lifecycle; merge conflicts → 409 |
-| `GET /api/v1/search?q=` | Ranked search (FTS now, hybrid later, same shape) |
+| `GET /api/v1/search?q=` | The query language (ADR-0016): `q` takes operators + free text, identical to `engram search` |
 | `GET /api/v1/events?after=&limit=` | Audit feed over the raw log |
 
 ## Client generation

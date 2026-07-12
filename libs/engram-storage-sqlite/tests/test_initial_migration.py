@@ -1,4 +1,4 @@
-"""Integration test: the initial migration produces the contracted schema,
+"""Integration test: the migration chain produces the contracted schema,
 including the append-only enforcement on ``events``."""
 
 import sqlite3
@@ -18,6 +18,7 @@ EXPECTED_TABLES = {
     "links",
     "projection_checkpoints",
     "index_meta",
+    "memory_fts",  # M2; its five memory_fts_* shadow tables are FTS5 internals
 }
 
 
@@ -36,7 +37,7 @@ def test_upgrade_head_creates_contracted_schema(tmp_path: Path) -> None:
         tables = {
             row[0]
             for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
-            if not row[0].startswith(("sqlite_", "alembic_"))
+            if not row[0].startswith(("sqlite_", "alembic_", "memory_fts_"))
         }
         triggers = {
             row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'trigger'")

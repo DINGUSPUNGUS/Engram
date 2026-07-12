@@ -1,8 +1,9 @@
 # engram
 
-> **Status: pre-alpha.** The event core works: `engram init / add / list / show / rebuild`
-> store real, typed, replayable memories in an append-only event log. Search, the REST
-> surface, the markdown/git export, proposals, and the AI pipeline land phase by phase
+> **Status: pre-alpha.** The event core works (M1) and so does the query engine (M2):
+> `engram init / add / list / show / search / status / rebuild` store and query real,
+> typed, replayable memories — including time travel (`show --at`). The markdown/git
+> export, proposals, the AI pipeline, and the surfaces land milestone by milestone
 > ([roadmap](docs/roadmap.md)).
 
 **engram** is a local-first, user-owned memory engine for AI assistants. It lets ChatGPT,
@@ -64,7 +65,7 @@ tables      later)                   │
 | `evaluations/` | Golden cases + synthetic corpus spec + the committed quality baseline. |
 | `apps/api` | FastAPI REST server (thin shell over application services). |
 | `apps/cli` | `engram` command-line interface (Typer). |
-| `apps/mcp` | MCP server (stub — roadmap phase 7). |
+| `apps/mcp` | MCP server (stub — milestone M6). |
 | `apps/web` | Next.js 15 dashboard. |
 | `packages/api-client` | TypeScript client generated from the OpenAPI contract. |
 | `docs/` | Architecture, ADRs, conventions, roadmap. Start with [docs/architecture.md](docs/architecture.md). |
@@ -82,10 +83,13 @@ uv run engram init           # create your memory space (~/.engram)
 uv run engram add fact "I prefer dark mode" -t ui
 uv run engram add project myapp --attr name=myapp --attr status=active
 uv run engram list
+uv run engram search "kind:project status:active dark mode"   # the query language
 uv run engram show <id>      # full state + event timeline
+uv run engram show <id> --version 1   # time travel: the memory as it first existed
+uv run engram status         # event log totals + projection drift detection
 uv run engram rebuild        # drop projections, replay the log — same state
 
-pnpm dev                     # API on :8000, web on :3000 (route stubs until phase 3)
+pnpm dev                     # API on :8000, web on :3000 (route stubs until M7)
 ```
 
 Everything runs locally. No Docker required (compose files exist for convenience), no cloud,

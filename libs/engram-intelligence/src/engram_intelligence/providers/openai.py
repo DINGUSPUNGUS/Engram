@@ -1,5 +1,5 @@
 """OpenAI provider. The ``openai`` SDK will be imported here and only here, added
-as an optional extra when implemented (roadmap phase 8)."""
+as an optional extra when implemented (milestone M5)."""
 
 from engram_intelligence.provider import LLMRequest, LLMResponse
 

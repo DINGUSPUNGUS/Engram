@@ -8,7 +8,7 @@ dependencies = [
     "engram-events",
 ]
 # Deliberately NO vendor SDKs here (ADR-0012). anthropic/openai/google-genai are added
-# as optional extras when the corresponding provider is implemented (roadmap phase 8),
+# as optional extras when the corresponding provider is implemented (milestone M5),
 # and they may only ever be imported inside engram_intelligence/providers/.
 
 [tool.uv.sources]

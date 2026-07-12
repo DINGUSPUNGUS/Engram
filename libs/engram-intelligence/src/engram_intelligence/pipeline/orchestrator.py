@@ -3,7 +3,7 @@
 Stateless stages, orchestrator-owned run state: partial re-runs (re-score without
 re-extract) are natural. Terminal action is ``ProposalCommandService.open_proposal``
 — stages 8 (human approval) and 9 (commit) are the existing review flow (ADR-0011).
-Stub until roadmap phase 8.
+Stub until milestone M5.
 """
 
 from engram_core.application.commands.proposal_commands import ProposalCommandService

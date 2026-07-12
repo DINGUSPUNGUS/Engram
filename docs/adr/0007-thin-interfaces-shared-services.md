@@ -21,7 +21,7 @@ may only:
 
 "Logic in a router/command/tool-handler is a bug" is a stated review rule in
 CONTRIBUTING.md. The MCP app stays deliberately empty until the services it would wrap
-exist (roadmap phase 7) — building it earlier would force it to invent logic.
+exist (milestone M6) — building it earlier would force it to invent logic.
 
 ## Consequences
 

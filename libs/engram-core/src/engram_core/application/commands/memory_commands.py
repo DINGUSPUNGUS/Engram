@@ -8,8 +8,8 @@ The choreography every command follows (ADR-0002):
 4. append via the repository (optimistic concurrency on ``stream_seq``),
 5. publish the appended envelopes on the bus so projections fan out.
 
-Phase 1 implements the narrative core; spine/link/merge/undo commands land with
-their phases (contracts unchanged).
+M1 implemented the narrative core; spine/link/merge/undo commands land with
+M4 (contracts unchanged).
 """
 
 from collections.abc import Sequence
@@ -193,16 +193,16 @@ class MemoryCommandService:
         appended = self._repository.append(envelopes)
         self._bus.publish(appended)
 
-    # -- later phases (contracts unchanged) --------------------------------------
+    # -- later milestones (contracts unchanged) ----------------------------------
 
     def update_attributes(
         self, memory_id: MemoryId, input: UpdateAttributesInput, provenance: Provenance
     ) -> None:
-        """Sparse change to kind-schema fields (phase 3)."""
+        """Sparse change to kind-schema fields (M4)."""
         raise NotImplementedError
 
     def confirm_memory(self, memory_id: MemoryId, note: str | None, provenance: Provenance) -> None:
-        """Vouch for a memory (phase 5)."""
+        """Vouch for a memory (M4)."""
         raise NotImplementedError
 
     def contradict_memory(
@@ -212,13 +212,13 @@ class MemoryCommandService:
         note: str | None,
         provenance: Provenance,
     ) -> None:
-        """Dispute a memory (phase 5)."""
+        """Dispute a memory (M4)."""
         raise NotImplementedError
 
     def add_evidence(
         self, memory_id: MemoryId, evidence: EvidenceRef, provenance: Provenance
     ) -> None:
-        """Append supporting evidence (phase 5)."""
+        """Append supporting evidence (M4)."""
         raise NotImplementedError
 
     def adjust_importance(
@@ -229,7 +229,7 @@ class MemoryCommandService:
         user_weight: float | None = None,
         provenance: Provenance,
     ) -> None:
-        """Pin/unpin or set the explicit user weight (phase 5)."""
+        """Pin/unpin or set the explicit user weight (M4)."""
         raise NotImplementedError
 
     def set_visibility(
@@ -239,11 +239,11 @@ class MemoryCommandService:
         allowed_actors: tuple[str, ...],
         provenance: Provenance,
     ) -> None:
-        """Change who may recall this memory (phase 5)."""
+        """Change who may recall this memory (M4)."""
         raise NotImplementedError
 
     def set_lifetime(self, memory_id: MemoryId, lifetime: Lifetime, provenance: Provenance) -> None:
-        """Change the retention policy (phase 5)."""
+        """Change the retention policy (M4)."""
         raise NotImplementedError
 
     def link_memories(
@@ -253,7 +253,7 @@ class MemoryCommandService:
         relation: LinkRelation,
         provenance: Provenance,
     ) -> None:
-        """Create a typed tier-1 edge (phase 3)."""
+        """Create a typed tier-1 edge (M4)."""
         raise NotImplementedError
 
     def merge_memories(
@@ -263,9 +263,9 @@ class MemoryCommandService:
         merged_content: str,
         provenance: Provenance,
     ) -> None:
-        """Entity resolution merge (phase 5)."""
+        """Entity resolution merge (M4)."""
         raise NotImplementedError
 
     def undo_last_change(self, memory_id: MemoryId, provenance: Provenance) -> None:
-        """Append the compensating event (phase 5)."""
+        """Append the compensating event (M4)."""
         raise NotImplementedError

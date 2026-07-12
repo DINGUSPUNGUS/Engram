@@ -37,7 +37,7 @@ grows, a small daemon owns the space (topology change — the ports don't move).
 - Undo/audit/replay come from the log, not from git plumbing. ✔
 - The markdown repo stays clean for humans (state files, not event noise in filenames). ✔
 - Two-way markdown sync becomes the hardest subsystem (accepted; isolated in one adapter,
-  deferred to roadmap phase 4; fallback: export-only + proposals for external edits).
+  deferred to milestone M3; fallback: export-only + proposals for external edits).
 - Reserved names for later projections: `memory_fts` (FTS5), `memory_vectors` (sqlite-vec).
 
 ## Alternatives considered

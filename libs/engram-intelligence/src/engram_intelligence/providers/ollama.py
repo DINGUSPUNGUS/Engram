@@ -1,7 +1,7 @@
 """Ollama provider — the local-first reference default (ADR-0012).
 
 Every pipeline stage must be fully functional against a local model with zero cloud
-dependencies; this adapter is therefore the one implemented *first* in phase 8.
+dependencies; this adapter is therefore the one implemented *first* in M5.
 Plain HTTP to the Ollama API; no SDK needed.
 """
 

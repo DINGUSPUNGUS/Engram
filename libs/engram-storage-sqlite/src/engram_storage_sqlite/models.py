@@ -12,13 +12,13 @@ The memory model of record is docs/memory-model.md: memories carry the twelve-ki
 ``kind`` discriminator, a JSON ``attributes`` payload (validated against the
 KindRegistry *before* write — the DB stores only schema-valid data), and the
 justification spine. Kind-specific querying uses expression indexes on
-``json_extract(attributes, …)`` plus per-kind SQL views (created with the scoring
-projection in phase 2). Derived scores (effective confidence, retention) are NOT
-columns here — they live in the recomputable scoring projection (ADR-0009).
+``json_extract(attributes, …)``; the query language's attribute operator rides them
+(ADR-0016). Derived scores (effective confidence, retention) are NOT columns here —
+they are computed at query time, per ADR-0009.
 
 UUIDs are stored as canonical lowercase strings; timestamps as UTC ISO-8601.
-FTS5 / sqlite-vec virtual tables are reserved by name (`memory_fts`,
-`memory_vectors`) and deliberately absent.
+The ``memory_fts`` FTS5 virtual table (migration 0002) is raw SQL, not a SQLModel —
+it appears only in the search projection. ``memory_vectors`` stays reserved (M5).
 """
 
 from datetime import datetime

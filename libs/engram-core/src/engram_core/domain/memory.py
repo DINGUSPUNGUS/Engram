@@ -5,10 +5,10 @@ and commands (``decide_*``) validate invariants — including kind-schema valida
 through the KindRegistry — and return the event payloads to append. They never
 mutate anything themselves.
 
-Phase 1 implements the narrative core: create, edit, tag, archive/restore, delete,
+M1 implemented the narrative core: create, edit, tag, archive/restore, delete,
 record-access. The spine commands (confirm/contradict/evidence/importance/
-visibility/lifetime), links, and merge keep their contracts as stubs and land with
-their phases.
+visibility/lifetime), links, and merge keep their contracts as stubs and land
+with M4.
 """
 
 import dataclasses
@@ -130,7 +130,7 @@ class Memory:
         """Return the state after one more event. Pure.
 
         Raises:
-            ValidationError: event types this phase does not fold yet — replaying
+            ValidationError: event types the aggregate does not fold yet — replaying
                 them silently would corrupt state.
         """
         payload = envelope.payload
@@ -161,9 +161,7 @@ class Memory:
                     )
                 }
             case _:
-                raise ValidationError(
-                    f"event type not foldable yet (phase 1): {envelope.event_type}"
-                )
+                raise ValidationError(f"event type not foldable yet: {envelope.event_type}")
         return dataclasses.replace(self, version=envelope.stream_seq, **changes)  # type: ignore[arg-type]
 
     # -- guards -----------------------------------------------------------------
@@ -279,48 +277,48 @@ class Memory:
         self._require_live()
         return (ev.MemoryAccessed(context=context),)
 
-    # -- later phases (contracts unchanged, bodies land with their phase) -------
+    # -- later milestones (contracts unchanged, bodies land with M4) ------------
 
     def decide_update_attributes(
         self, changes: dict[str, object], kinds: KindRegistry
     ) -> Sequence[object]:
-        """Produce ``MemoryAttributesUpdated`` (phase 3)."""
+        """Produce ``MemoryAttributesUpdated`` (M4)."""
         raise NotImplementedError
 
     def decide_confirm(self, note: str | None = None) -> Sequence[object]:
-        """Produce ``MemoryConfirmed`` (phase 5)."""
+        """Produce ``MemoryConfirmed`` (M4)."""
         raise NotImplementedError
 
     def decide_contradict(
         self, contradicting_id: MemoryId | None = None, note: str | None = None
     ) -> Sequence[object]:
-        """Produce ``MemoryContradicted`` (phase 5)."""
+        """Produce ``MemoryContradicted`` (M4)."""
         raise NotImplementedError
 
     def decide_add_evidence(self, evidence: EvidenceRef) -> Sequence[object]:
-        """Produce ``MemoryEvidenceAdded`` (phase 5)."""
+        """Produce ``MemoryEvidenceAdded`` (M4)."""
         raise NotImplementedError
 
     def decide_adjust_importance(
         self, *, pinned: bool | None = None, user_weight: float | None = None
     ) -> Sequence[object]:
-        """Produce ``MemoryImportanceAdjusted`` (phase 5)."""
+        """Produce ``MemoryImportanceAdjusted`` (M4)."""
         raise NotImplementedError
 
     def decide_set_visibility(
         self, visibility: Visibility, allowed_actors: Sequence[str] = ()
     ) -> Sequence[object]:
-        """Produce ``MemoryVisibilityChanged`` (phase 5)."""
+        """Produce ``MemoryVisibilityChanged`` (M4)."""
         raise NotImplementedError
 
     def decide_set_lifetime(self, lifetime: Lifetime) -> Sequence[object]:
-        """Produce ``MemoryLifetimeChanged`` (phase 5)."""
+        """Produce ``MemoryLifetimeChanged`` (M4)."""
         raise NotImplementedError
 
     def decide_link(self, link: Link) -> Sequence[object]:
-        """Produce ``MemoryLinked`` (phase 3)."""
+        """Produce ``MemoryLinked`` (M4)."""
         raise NotImplementedError
 
     def decide_merge_from(self, source: "Memory", merged_content: str) -> Sequence[object]:
-        """Produce ``MemoryMerged`` (phase 5)."""
+        """Produce ``MemoryMerged`` (M4)."""
         raise NotImplementedError

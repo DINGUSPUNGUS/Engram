@@ -49,7 +49,7 @@ class StageEvaluator(Protocol):
 
 def load_golden_cases(directory: Path) -> Sequence[EvalCase]:
     """Parse evaluations/golden/*.md into cases (format: docs/intelligence.md §4).
-    Implementation lands with the pipeline (roadmap phase 8)."""
+    Implementation lands with the pipeline (milestone M5)."""
     raise NotImplementedError
 
 

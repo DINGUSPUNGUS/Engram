@@ -4,7 +4,13 @@
       "AddEvidenceRequest": {
         "properties": {
           "evidence_type": {
-            "enum": ["quote", "uri", "conversation", "document", "observation"],
+            "enum": [
+              "quote",
+              "uri",
+              "conversation",
+              "document",
+              "observation"
+            ],
             "title": "Evidence Type",
             "type": "string"
           },
@@ -25,7 +31,10 @@
             "type": "string"
           }
         },
-        "required": ["evidence_type", "value"],
+        "required": [
+          "evidence_type",
+          "value"
+        ],
         "title": "AddEvidenceRequest",
         "type": "object"
       },
@@ -153,7 +162,12 @@
           },
           "lifetime_policy": {
             "default": "standard",
-            "enum": ["permanent", "standard", "until", "ephemeral"],
+            "enum": [
+              "permanent",
+              "standard",
+              "until",
+              "ephemeral"
+            ],
             "title": "Lifetime Policy",
             "type": "string"
           },
@@ -197,12 +211,19 @@
           },
           "visibility": {
             "default": "shared",
-            "enum": ["shared", "private", "restricted"],
+            "enum": [
+              "shared",
+              "private",
+              "restricted"
+            ],
             "title": "Visibility",
             "type": "string"
           }
         },
-        "required": ["kind", "title"],
+        "required": [
+          "kind",
+          "title"
+        ],
         "title": "CreateMemoryRequest",
         "type": "object"
       },
@@ -248,7 +269,9 @@
             "title": "Title"
           }
         },
-        "required": ["expected_version"],
+        "required": [
+          "expected_version"
+        ],
         "title": "EditMemoryRequest",
         "type": "object"
       },
@@ -273,7 +296,9 @@
             "title": "Next After"
           }
         },
-        "required": ["items"],
+        "required": [
+          "items"
+        ],
         "title": "EventFeedResponse",
         "type": "object"
       },
@@ -349,7 +374,13 @@
             "title": "Added At"
           },
           "evidence_type": {
-            "enum": ["quote", "uri", "conversation", "document", "observation"],
+            "enum": [
+              "quote",
+              "uri",
+              "conversation",
+              "document",
+              "observation"
+            ],
             "title": "Evidence Type",
             "type": "string"
           },
@@ -369,7 +400,10 @@
             "type": "string"
           }
         },
-        "required": ["evidence_type", "value"],
+        "required": [
+          "evidence_type",
+          "value"
+        ],
         "title": "EvidenceView",
         "type": "object"
       },
@@ -408,7 +442,10 @@
             "type": "string"
           }
         },
-        "required": ["target_id", "relation"],
+        "required": [
+          "target_id",
+          "relation"
+        ],
         "title": "LinkView",
         "type": "object"
       },
@@ -433,7 +470,9 @@
             "title": "Next Cursor"
           }
         },
-        "required": ["items"],
+        "required": [
+          "items"
+        ],
         "title": "MemoryListResponse",
         "type": "object"
       },
@@ -515,7 +554,12 @@
             "title": "Last Confirmed At"
           },
           "lifetime_policy": {
-            "enum": ["permanent", "standard", "until", "ephemeral"],
+            "enum": [
+              "permanent",
+              "standard",
+              "until",
+              "ephemeral"
+            ],
             "title": "Lifetime Policy",
             "type": "string"
           },
@@ -586,7 +630,11 @@
             "type": "integer"
           },
           "visibility": {
-            "enum": ["shared", "private", "restricted"],
+            "enum": [
+              "shared",
+              "private",
+              "restricted"
+            ],
             "title": "Visibility",
             "type": "string"
           }
@@ -641,7 +689,9 @@
             "type": "string"
           }
         },
-        "required": ["title"],
+        "required": [
+          "title"
+        ],
         "title": "OpenProposalRequest",
         "type": "object"
       },
@@ -684,7 +734,10 @@
             "type": "string"
           }
         },
-        "required": ["title", "status"],
+        "required": [
+          "title",
+          "status"
+        ],
         "title": "Problem",
         "type": "object"
       },
@@ -709,7 +762,9 @@
             "title": "Next Cursor"
           }
         },
-        "required": ["items"],
+        "required": [
+          "items"
+        ],
         "title": "ProposalListResponse",
         "type": "object"
       },
@@ -741,7 +796,13 @@
             "title": "Review Note"
           },
           "status": {
-            "enum": ["draft", "pending", "approved", "rejected", "merged"],
+            "enum": [
+              "draft",
+              "pending",
+              "approved",
+              "rejected",
+              "merged"
+            ],
             "title": "Status",
             "type": "string"
           },
@@ -755,7 +816,14 @@
             "type": "string"
           }
         },
-        "required": ["id", "title", "description", "status", "created_at", "updated_at"],
+        "required": [
+          "id",
+          "title",
+          "description",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
         "title": "ProposalResponse",
         "type": "object"
       },
@@ -778,29 +846,57 @@
       },
       "SearchHitResponse": {
         "properties": {
+          "effective_confidence": {
+            "title": "Effective Confidence",
+            "type": "number"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
           "memory_id": {
             "format": "uuid",
             "title": "Memory Id",
             "type": "string"
           },
           "score": {
-            "title": "Score",
-            "type": "number"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
           },
           "slug": {
             "title": "Slug",
             "type": "string"
           },
           "snippet": {
-            "title": "Snippet",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snippet"
           },
           "title": {
             "title": "Title",
             "type": "string"
           }
         },
-        "required": ["memory_id", "slug", "title", "snippet", "score"],
+        "required": [
+          "memory_id",
+          "kind",
+          "slug",
+          "title",
+          "effective_confidence"
+        ],
         "title": "SearchHitResponse",
         "type": "object"
       },
@@ -813,19 +909,38 @@
             "title": "Hits",
             "type": "array"
           },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
           "query": {
             "title": "Query",
             "type": "string"
           }
         },
-        "required": ["query", "hits"],
+        "required": [
+          "query",
+          "hits"
+        ],
         "title": "SearchResponse",
         "type": "object"
       },
       "SetLifetimeRequest": {
         "properties": {
           "lifetime_policy": {
-            "enum": ["permanent", "standard", "until", "ephemeral"],
+            "enum": [
+              "permanent",
+              "standard",
+              "until",
+              "ephemeral"
+            ],
             "title": "Lifetime Policy",
             "type": "string"
           },
@@ -843,7 +958,9 @@
             "title": "Lifetime Until"
           }
         },
-        "required": ["lifetime_policy"],
+        "required": [
+          "lifetime_policy"
+        ],
         "title": "SetLifetimeRequest",
         "type": "object"
       },
@@ -859,12 +976,18 @@
             "type": "array"
           },
           "visibility": {
-            "enum": ["shared", "private", "restricted"],
+            "enum": [
+              "shared",
+              "private",
+              "restricted"
+            ],
             "title": "Visibility",
             "type": "string"
           }
         },
-        "required": ["visibility"],
+        "required": [
+          "visibility"
+        ],
         "title": "SetVisibilityRequest",
         "type": "object"
       },
@@ -893,7 +1016,13 @@
             "type": "integer"
           }
         },
-        "required": ["event_id", "event_type", "occurred_at", "actor", "stream_seq"],
+        "required": [
+          "event_id",
+          "event_type",
+          "occurred_at",
+          "actor",
+          "stream_seq"
+        ],
         "title": "TimelineEntryResponse",
         "type": "object"
       },
@@ -912,7 +1041,10 @@
             "type": "string"
           }
         },
-        "required": ["memory_id", "entries"],
+        "required": [
+          "memory_id",
+          "entries"
+        ],
         "title": "TimelineResponse",
         "type": "object"
       },
@@ -930,7 +1062,10 @@
             "type": "integer"
           }
         },
-        "required": ["expected_version", "changes"],
+        "required": [
+          "expected_version",
+          "changes"
+        ],
         "title": "UpdateAttributesRequest",
         "type": "object"
       },
@@ -941,7 +1076,9 @@
             "type": "string"
           }
         },
-        "required": ["version"],
+        "required": [
+          "version"
+        ],
         "title": "VersionResponse",
         "type": "object"
       }
@@ -995,7 +1132,9 @@
           }
         },
         "summary": "Rebuild Projections",
-        "tags": ["system"]
+        "tags": [
+          "system"
+        ]
       }
     },
     "/api/v1/events": {
@@ -1062,7 +1201,9 @@
           }
         },
         "summary": "Event Feed",
-        "tags": ["events"]
+        "tags": [
+          "events"
+        ]
       }
     },
     "/api/v1/memories": {
@@ -1198,7 +1339,9 @@
           }
         },
         "summary": "List Memories",
-        "tags": ["memories"]
+        "tags": [
+          "memories"
+        ]
       },
       "post": {
         "description": "Create a typed memory; attributes must satisfy the kind schema (422 otherwise).",
@@ -1246,7 +1389,9 @@
           }
         },
         "summary": "Create Memory",
-        "tags": ["memories"]
+        "tags": [
+          "memories"
+        ]
       }
     },
     "/api/v1/memories/{memory_id}": {
@@ -1291,7 +1436,9 @@
           }
         },
         "summary": "Delete Memory",
-        "tags": ["memories"]
+        "tags": [
+          "memories"
+        ]
       },
       "get": {
         "description": "Current state of one memory, spine included.",
@@ -1341,7 +1488,9 @@
           }
         },
         "summary": "Get Memory",
-        "tags": ["memories"]
+        "tags": [
+          "memories"
+        ]
       },
       "patch": {
         "description": "Sparse narrative edit (title/content/slug). 409 when ``expected_version`` is stale.",
@@ -1401,7 +1550,9 @@
           }
         },
         "summary": "Edit Memory",
-        "tags": ["memories"]
+        "tags": [
+          "memories"
+        ]
       }
     },
     "/api/v1/memories/{memory_id}/attributes": {
@@ -1463,7 +1614,9 @@
           }
         },
         "summary": "Update Attributes",
-        "tags": ["memories"]
+        "tags": [
+          "memories"
+        ]
       }
     },
     "/api/v1/memories/{memory_id}/confirm": {
@@ -1525,7 +1678,9 @@
           }
         },
         "summary": "Confirm Memory",
-        "tags": ["memories"]
+        "tags": [
+          "memories"
+        ]
       }
     },
     "/api/v1/memories/{memory_id}/contradict": {
@@ -1587,7 +1742,9 @@
           }
         },
         "summary": "Contradict Memory",
-        "tags": ["memories"]
+        "tags": [
+          "memories"
+        ]
       }
     },
     "/api/v1/memories/{memory_id}/evidence": {
@@ -1649,7 +1806,9 @@
           }
         },
         "summary": "Add Evidence",
-        "tags": ["memories"]
+        "tags": [
+          "memories"
+        ]
       }
     },
     "/api/v1/memories/{memory_id}/importance": {
@@ -1711,7 +1870,9 @@
           }
         },
         "summary": "Adjust Importance",
-        "tags": ["memories"]
+        "tags": [
+          "memories"
+        ]
       }
     },
     "/api/v1/memories/{memory_id}/lifetime": {
@@ -1773,7 +1934,9 @@
           }
         },
         "summary": "Set Lifetime",
-        "tags": ["memories"]
+        "tags": [
+          "memories"
+        ]
       }
     },
     "/api/v1/memories/{memory_id}/timeline": {
@@ -1825,7 +1988,9 @@
           }
         },
         "summary": "Memory Timeline",
-        "tags": ["memories"]
+        "tags": [
+          "memories"
+        ]
       }
     },
     "/api/v1/memories/{memory_id}/undo": {
@@ -1877,7 +2042,9 @@
           }
         },
         "summary": "Undo Last Change",
-        "tags": ["memories"]
+        "tags": [
+          "memories"
+        ]
       }
     },
     "/api/v1/memories/{memory_id}/visibility": {
@@ -1939,7 +2106,9 @@
           }
         },
         "summary": "Set Visibility",
-        "tags": ["memories"]
+        "tags": [
+          "memories"
+        ]
       }
     },
     "/api/v1/proposals": {
@@ -1979,7 +2148,9 @@
           }
         },
         "summary": "List Proposals",
-        "tags": ["proposals"]
+        "tags": [
+          "proposals"
+        ]
       },
       "post": {
         "description": "Open a proposal carrying draft events for review.",
@@ -2027,7 +2198,9 @@
           }
         },
         "summary": "Open Proposal",
-        "tags": ["proposals"]
+        "tags": [
+          "proposals"
+        ]
       }
     },
     "/api/v1/proposals/{proposal_id}/approve": {
@@ -2088,7 +2261,9 @@
           }
         },
         "summary": "Approve Proposal",
-        "tags": ["proposals"]
+        "tags": [
+          "proposals"
+        ]
       }
     },
     "/api/v1/proposals/{proposal_id}/merge": {
@@ -2140,7 +2315,9 @@
           }
         },
         "summary": "Merge Proposal",
-        "tags": ["proposals"]
+        "tags": [
+          "proposals"
+        ]
       }
     },
     "/api/v1/proposals/{proposal_id}/reject": {
@@ -2201,19 +2378,23 @@
           }
         },
         "summary": "Reject Proposal",
-        "tags": ["proposals"]
+        "tags": [
+          "proposals"
+        ]
       }
     },
     "/api/v1/search": {
       "get": {
-        "description": "FTS today, hybrid vector+FTS later \u2014 same endpoint, same shape.",
+        "description": "One language everywhere; FTS is one operator, vectors join it in M5.",
         "operationId": "search_api_v1_search_get",
         "parameters": [
           {
+            "description": "engram query language",
             "in": "query",
             "name": "q",
             "required": true,
             "schema": {
+              "description": "engram query language",
               "minLength": 1,
               "title": "Q",
               "type": "string"
@@ -2221,37 +2402,7 @@
           },
           {
             "in": "query",
-            "name": "kind",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "enum": [
-                    "fact",
-                    "preference",
-                    "person",
-                    "organization",
-                    "project",
-                    "skill",
-                    "goal",
-                    "contact",
-                    "event",
-                    "location",
-                    "asset",
-                    "relationship"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Kind"
-            }
-          },
-          {
-            "in": "query",
-            "name": "tag",
+            "name": "cursor",
             "required": false,
             "schema": {
               "anyOf": [
@@ -2262,7 +2413,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Tag"
+              "title": "Cursor"
             }
           },
           {
@@ -2311,7 +2462,9 @@
           }
         },
         "summary": "Search",
-        "tags": ["search"]
+        "tags": [
+          "search"
+        ]
       }
     },
     "/healthz": {
@@ -2331,7 +2484,9 @@
           }
         },
         "summary": "Healthz",
-        "tags": ["system"]
+        "tags": [
+          "system"
+        ]
       }
     },
     "/version": {
@@ -2350,7 +2505,9 @@
           }
         },
         "summary": "Version",
-        "tags": ["system"]
+        "tags": [
+          "system"
+        ]
       }
     }
   }

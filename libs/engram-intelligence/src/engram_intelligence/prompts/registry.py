@@ -77,6 +77,6 @@ def load_library(directory: Path) -> PromptRegistry:
     """Load every ``*.md`` prompt file (YAML frontmatter + body) into a registry.
 
     Format of record: docs/intelligence.md §3; example in ``library/``.
-    Implementation lands with the pipeline (roadmap phase 8).
+    Implementation lands with the pipeline (milestone M5).
     """
     raise NotImplementedError

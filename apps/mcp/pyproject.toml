@@ -1,7 +1,7 @@
 [project]
 name = "engram-mcp"
 version = "0.1.0"
-description = "engram MCP server (roadmap phase 7 — deliberately empty)."
+description = "engram MCP server (milestone M6 — deliberately empty)."
 requires-python = ">=3.13"
 dependencies = [
     "engram-core",

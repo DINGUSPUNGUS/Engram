@@ -1,6 +1,6 @@
 # @engram/mcp
 
-MCP server for engram — **deliberately a stub** until roadmap phase 7.
+MCP server for engram — **deliberately a stub** until milestone M6.
 
 ## Why it's empty
 

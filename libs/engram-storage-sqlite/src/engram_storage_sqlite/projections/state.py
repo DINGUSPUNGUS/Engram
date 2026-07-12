@@ -3,7 +3,7 @@
 Deterministic and idempotent per ``global_seq``: envelopes at or below the
 checkpoint are skipped, and row updates plus the checkpoint advance commit in one
 transaction — replaying the whole log always lands on the same rows
-(the phase-1 invariant, CI-tested).
+(the M1 invariant, CI-tested).
 """
 
 from sqlalchemy.engine import Engine

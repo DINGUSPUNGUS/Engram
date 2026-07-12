@@ -4,7 +4,7 @@ Implements the ``MarkdownSync`` port. Diffs the working tree against the state
 recorded in the manifest, parses changed documents, and produces
 ``MemoryEditedExternally`` envelopes for the command side to validate and append.
 This is deliberately the *only* place where files influence the event log
-(ADR-0001). Deferred to roadmap phase 4; stubs define the boundary.
+(ADR-0001). Deferred to milestone M3; stubs define the boundary.
 """
 
 from collections.abc import Sequence

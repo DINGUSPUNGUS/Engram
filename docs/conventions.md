@@ -9,7 +9,7 @@
 | Modules, functions, variables (py) | `snake_case` | `memory_relpath` |
 | Classes, aggregates, events | `PascalCase` | `MemoryCommandService` |
 | Events | `<Noun><PastTenseVerb>` — facts, not commands | `MemoryCreated` |
-| Ports | Capability noun, no `I` prefix | `SearchIndex`, `Clock` |
+| Ports | Capability noun, no `I` prefix | `QueryEngine`, `Clock` |
 | Adapters | `<Tech><Port>` | `SqliteEventStore`, `GitVersionControl` |
 | REST paths / JSON fields | kebab-case / `snake_case` | `/api/v1/memories`, `next_cursor` |
 | TS variables / components | `camelCase` / `PascalCase` | `apiClient`, `DashboardPage` |

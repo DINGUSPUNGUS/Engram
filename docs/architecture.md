@@ -77,7 +77,7 @@ engram/
 ├── apps/
 │   ├── api/        FastAPI shell (routers, schemas, DI wiring, error mapping)
 │   ├── cli/        Typer shell (`engram` command)
-│   ├── mcp/        MCP server (deliberately empty until roadmap phase 7)
+│   ├── mcp/        MCP server (deliberately empty until milestone M6)
 │   └── web/        Next.js 15 dashboard (App Router, Tailwind v4, shadcn/ui)
 ├── packages/
 │   ├── api-client/ TS client generated from the OpenAPI contract (openapi-fetch)
@@ -127,8 +127,8 @@ not aspirational: `import-linter` runs the layers contract in CI (see root
 knows nothing about SQLite, git, HTTP, or files; engram-events knows nothing about engram.
 
 Everything crosses boundaries through **ports** (`engram_core/domain/ports.py` —
-`MemoryRepository`, `MemoryQuery`, `SearchIndex`, `EmbeddingProvider`, `MarkdownSync`,
-`VersionControl`, `Clock`) or the kernel contracts (`EventStore`, `EventBus`,
+`MemoryRepository`, `MemoryQuery`, `QueryEngine`, `MemoryHistory`, `EmbeddingProvider`,
+`MarkdownSync`, `VersionControl`, `Clock`) or the kernel contracts (`EventStore`, `EventBus`,
 `Projection`). Adapters are replaceable per port; the DI composition root in each app
 (`apps/api/src/engram_api/dependencies.py`) is the only place that names implementations.
 This is also the future plugin seam: a plugin is an adapter registered at the composition
@@ -221,7 +221,7 @@ An architecture review of this architecture. These are real risks, ranked.
 2. **Markdown two-way sync is now the hardest subsystem.** With SQLite canonical, a direct
    file edit must be detected, parsed, validated, and appended as events — a mini sync
    engine with conflict semantics. Contained: it is one port (`MarkdownSync`), one adapter
-   package, and deliberately deferred to roadmap phase 4 so the event core stabilizes
+   package, and deliberately deferred to milestone M3 so the event core stabilizes
    first. The fallback if it proves intractable: export stays one-way and external edits
    become proposals a human approves in the dashboard.
 3. **"Everything through events" can over-decouple.** Explicitly bounded: writes flow
@@ -245,7 +245,7 @@ An architecture review of this architecture. These are real risks, ranked.
    releases. Confined to engram-storage-sqlite behind ports; the event store is nearly raw
    SQL anyway; swapping to plain SQLAlchemy touches one package.
 8. **sqlite-vec distribution is rough on Windows** (loadable extension packaging). The
-   `SearchIndex` port therefore exposes `supports_vectors` as a capability flag — FTS-only
+   `QueryEngine` port therefore exposes `supports_vectors` as a capability flag — FTS-only
    installations must remain first-class forever.
 9. **The Proposal aggregate may over-abstract.** It re-implements a little of what git
    branches give for free, but against the event log rather than files. If it leaks,

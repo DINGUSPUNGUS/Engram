@@ -11,9 +11,10 @@ from pathlib import Path
 from typing import Protocol
 
 from engram_core.application.dto import (
+    MemoryQuerySpec,
     MemoryReadModel,
     Page,
-    SearchHit,
+    QueryHit,
     TimelineEntry,
 )
 from engram_core.domain.memory import Memory
@@ -94,20 +95,43 @@ class MemoryQuery(Protocol):
         ...
 
 
-class SearchIndex(Protocol):
-    """Search over memories. Vector search is an optional capability, not a given."""
+class QueryEngine(Protocol):
+    """Executes a parsed ``MemoryQuerySpec`` against the projections (ADR-0016).
+
+    Full-text match is one operator inside the spec, not a separate capability;
+    vector operators arrive behind ``supports_vectors`` (M5) — FTS-only installs
+    stay first-class."""
 
     @property
     def supports_vectors(self) -> bool: ...
 
-    def search(
+    def query(
         self,
-        query: str,
+        spec: MemoryQuerySpec,
         *,
-        kind: MemoryKind | None = None,
-        tag: str | None = None,
+        cursor: str | None = None,
         limit: int = 20,
-    ) -> Sequence[SearchHit]: ...
+    ) -> Page[QueryHit]:
+        """AND of every present term; hits carry snippet/score when text matched."""
+        ...
+
+
+class MemoryHistory(Protocol):
+    """Time-travel reads: reconstruct a memory as it was (falls out of ADR-0002)."""
+
+    def state_at(
+        self,
+        memory_id: MemoryId,
+        *,
+        at: datetime | None = None,
+        version: int | None = None,
+    ) -> Memory:
+        """Fold the stream up to ``at`` (occurred_at <= at) or ``version``.
+
+        Raises:
+            NotFoundError: unknown stream, or the memory did not exist yet then.
+        """
+        ...
 
 
 class EmbeddingProvider(Protocol):

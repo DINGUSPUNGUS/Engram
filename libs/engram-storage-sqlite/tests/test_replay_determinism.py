@@ -1,4 +1,4 @@
-"""THE phase-1 invariant: same log ⇒ same projection state, every time.
+"""THE M1 invariant: same log ⇒ same projection state, every time.
 
 Drives the full write path (service → aggregate → store → bus → projection), then
 resets and replays, and asserts the projected state is identical. If this test

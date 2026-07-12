@@ -67,14 +67,75 @@ class MemoryReadModel:
     version: int
 
 
+# ---------------------------------------------------------------------------
+# The query engine (ADR-0016)
+# ---------------------------------------------------------------------------
+
+
 @dataclass(frozen=True, slots=True)
-class SearchHit:
-    memory_id: MemoryId
+class ConfidenceFilter:
+    """Comparison against *effective* (decayed) confidence — derived, never stored."""
+
+    op: str  # ">", ">=", "<", "<="
+    value: float
+
+
+@dataclass(frozen=True, slots=True)
+class MemoryQuerySpec:
+    """One parsed query: AND of every present term (ADR-0016).
+
+    Produced only by ``query_language.parse_query``; executors translate it to their
+    storage. ``archived=None`` means the default (exclude archived); ``True`` means
+    only archived. ``attributes`` are kind-schema equality terms (``status:active``).
+    ``linked`` is a slug or UUID string, resolved by the executor.
+    """
+
+    text: str | None = None
+    kind: MemoryKind | None = None
+    tags: tuple[str, ...] = ()
+    slug: str | None = None
+    attributes: tuple[tuple[str, str], ...] = ()
+    confidence: ConfidenceFilter | None = None
+    updated_after: datetime | None = None
+    created_after: datetime | None = None
+    has: frozenset[str] = frozenset()
+    visibility: Visibility | None = None
+    linked: str | None = None
+    archived: bool | None = None
+    pinned: bool | None = None
+    stale: bool | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class QueryHit:
+    """One query result. ``snippet``/``score`` are set only when free text matched."""
+
+    memory: MemoryReadModel
+    snippet: str | None = None
+    score: float | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class MemorySnapshot:
+    """A memory exactly as it was after event ``version`` — the time-travel view.
+
+    Reconstructed by folding the stream up to a moment or version; carries no derived
+    scores (they are functions of *now*, which is precisely what this view escapes).
+    """
+
+    id: MemoryId
     kind: MemoryKind
     slug: str
     title: str
-    snippet: str
-    score: float
+    content: str
+    attributes: dict[str, object]
+    tags: tuple[str, ...]
+    confidence: float
+    lifetime_policy: str
+    visibility: str
+    archived: bool
+    deleted: bool
+    version: int
 
 
 @dataclass(frozen=True, slots=True)

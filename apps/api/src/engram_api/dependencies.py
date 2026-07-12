@@ -58,7 +58,8 @@ def get_memory_commands(
 ) -> MemoryCommandService:
     """Construct the memory command service with its SQLite-backed ports.
 
-    Architecture phase: adapter construction lands with the event-store milestone.
+    Wiring lands with M7 (REST completeness) — the adapters exist; the API's
+    composition root does not yet.
     """
     raise NotImplementedError
 

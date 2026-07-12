@@ -26,7 +26,7 @@ into a monolith where adding a consumer means editing every producer.
 
 ## Consequences
 
-- Subsystems stay independently replaceable; the plugin architecture (roadmap phase 9)
+- Subsystems stay independently replaceable; the plugin architecture (milestone M8)
   is "third-party projections + adapters", already shaped. ✔
 - One more package to version — trivial against the decoupling it buys.
 - Discipline required: the layering contract (import-linter) keeps the kernel clean.

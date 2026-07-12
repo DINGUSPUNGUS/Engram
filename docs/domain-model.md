@@ -63,8 +63,9 @@ scores derived in projections, retunable via `engram rebuild`).
 | --- | --- | --- |
 | `MemoryRepository`, `ProposalRepository` | write | engram-storage-sqlite |
 | `MemoryQuery` (kind/tag/stale filters, visibility-enforced) | read | engram-storage-sqlite |
-| `SearchIndex` (`supports_vectors` capability flag) | read | engram-storage-sqlite (FTS later, vec later) |
-| `EmbeddingProvider` | — | none (interface reserved; roadmap phase 6) |
+| `QueryEngine` (the query language, ADR-0016; `supports_vectors` capability flag) | read | engram-storage-sqlite (FTS5; vectors in M5) |
+| `MemoryHistory` (time travel: `state_at` a version or instant) | read | engram-storage-sqlite |
+| `EmbeddingProvider` | — | none (interface reserved; milestone M5) |
 | `MarkdownSync`, `VersionControl` | export | engram-export-git |
 | `Clock` | ambient | app-provided |
 | `EventStore`, `EventBus`, `Projection` | kernel | engram-storage-sqlite / in-process bus |
