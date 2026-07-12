@@ -84,11 +84,13 @@ addopts = "-ra --strict-markers"
 # Arrows point inward only: apps -> adapters -> core -> events.
 # ---------------------------------------------------------------------------
 [tool.importlinter]
+include_external_packages = true
 root_packages = [
     "engram_events",
     "engram_core",
     "engram_storage_sqlite",
     "engram_export_git",
+    "engram_intelligence",
     "engram_api",
     "engram_cli",
 ]
@@ -98,7 +100,26 @@ name = "Hexagonal layering (inward-only imports)"
 type = "layers"
 layers = [
     "engram_api | engram_cli",
-    "engram_storage_sqlite | engram_export_git",
+    "engram_storage_sqlite | engram_export_git | engram_intelligence",
     "engram_core",
     "engram_events",
 ]
+
+[[tool.importlinter.contracts]]
+# ADR-0012: vendor SDKs are confined to engram_intelligence.providers; the rest of
+# the intelligence layer (and everything else) must stay SDK-free.
+name = "LLM SDKs confined to providers"
+type = "forbidden"
+source_modules = [
+    "engram_events",
+    "engram_core",
+    "engram_storage_sqlite",
+    "engram_export_git",
+    "engram_intelligence.pipeline",
+    "engram_intelligence.prompts",
+    "engram_intelligence.evals",
+    "engram_intelligence.provider",
+    "engram_api",
+    "engram_cli",
+]
+forbidden_modules = ["anthropic", "openai", "google"]

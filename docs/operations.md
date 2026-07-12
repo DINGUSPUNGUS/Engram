@@ -50,6 +50,8 @@ Rules:
 | `ENGRAM_API_HOST` / `ENGRAM_API_PORT` | `127.0.0.1` / `8000` | API bind (loopback: see security.md) |
 | `ENGRAM_LOG_LEVEL` / `ENGRAM_LOG_FORMAT` | `INFO` / `console` | Logging |
 | `ENGRAM_ENV` | `development` | `development · production · test` |
+| `ENGRAM_LLM_PROVIDER` | `ollama` | Ingestion-pipeline model backend (ADR-0012): `ollama · claude · openai · gemini` |
+| `ENGRAM_LLM_MODEL` | — | Provider-specific model name; recorded as provenance, never branched on |
 | `NEXT_PUBLIC_API_URL` | `http://127.0.0.1:8000` | Where the browser reaches the API |
 
 `.env.example` at the repo root is the canonical, commented list — keep it in sync with

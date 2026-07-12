@@ -91,6 +91,8 @@ importers:
 
   libs/engram-export-git: {}
 
+  libs/engram-intelligence: {}
+
   libs/engram-storage-sqlite: {}
 
   packages/api-client:

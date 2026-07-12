@@ -68,6 +68,20 @@ Edges vs. reified relationships (ADR-0010): if a connection could ever need
 confirming, contradicting, or dating, make it a `relationship` memory; otherwise use
 a tier-1 `Link` from the closed relation vocabulary.
 
+## How to change AI behavior (prompts, providers, pipeline stages)
+
+AI-affecting changes are behavior changes and carry extra rules (docs/intelligence.md):
+
+1. **Prompts are immutable per version** (ADR-0013): improving one means a new
+   `name.vN.md` file in `engram_intelligence/prompts/library/` — never edit a shipped
+   version. Every prompt version needs at least one golden case exercising it.
+2. **The evaluation gate** (ADR-0014): run the golden suite; scores below
+   `evaluations/results/baseline.json` fail. Improvements update the baseline in the
+   same PR — the diff is the review evidence.
+3. **Vendor SDKs live only in `engram_intelligence/providers/`** (ADR-0012, enforced
+   by import-linter). Nothing may branch on `model_id`; use capability flags.
+4. A failure mode found in the wild becomes a golden case before its fix merges.
+
 ## How to add a projection
 
 Implement the `Projection` protocol from `engram_events` (`handles`, `apply`, checkpoint

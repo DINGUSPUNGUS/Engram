@@ -1,0 +1,11 @@
+{
+  "_meta": {
+    "description": "Committed evaluation baseline (ADR-0014). Scores are per-stage means over the golden set; LLM-backed stages record the provider+model they were measured with. Never lower a number here without an ADR-worthy reason.",
+    "generator_version": null,
+    "provider": null,
+    "model": null,
+    "measured_at": null
+  },
+  "stages": {},
+  "end_to_end": null
+}

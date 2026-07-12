@@ -13,6 +13,7 @@ members = [
     "engram-core",
     "engram-events",
     "engram-export-git",
+    "engram-intelligence",
     "engram-mcp",
     "engram-storage-sqlite",
     "engram-workspace",
@@ -274,6 +275,21 @@ requires-dist = [
     { name = "engram-events", editable = "libs/engram-events" },
     { name = "gitpython", specifier = ">=3.1.44" },
     { name = "pyyaml", specifier = ">=6.0.2" },
+]
+
+[[package]]
+name = "engram-intelligence"
+version = "0.1.0"
+source = { editable = "libs/engram-intelligence" }
+dependencies = [
+    { name = "engram-core" },
+    { name = "engram-events" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "engram-core", editable = "libs/engram-core" },
+    { name = "engram-events", editable = "libs/engram-events" },
 ]
 
 [[package]]

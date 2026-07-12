@@ -1,0 +1,23 @@
+[project]
+name = "engram-intelligence"
+version = "0.1.0"
+description = "engram AI layer: ingestion pipeline contracts, LLM provider port, versioned prompts, eval harness."
+requires-python = ">=3.13"
+dependencies = [
+    "engram-core",
+    "engram-events",
+]
+# Deliberately NO vendor SDKs here (ADR-0012). anthropic/openai/google-genai are added
+# as optional extras when the corresponding provider is implemented (roadmap phase 8),
+# and they may only ever be imported inside engram_intelligence/providers/.
+
+[tool.uv.sources]
+engram-core = { workspace = true }
+engram-events = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/engram_intelligence"]

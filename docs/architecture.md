@@ -6,6 +6,8 @@ either your change or this document is wrong — fix whichever it is in the same
 
 - **[The Memory Model](memory-model.md)** — the most load-bearing document: twelve typed
   kinds, the justification spine, lifecycle, decay, conflicts, graph semantics
+- **[Intelligence](intelligence.md)** — how AI enters: the ingestion pipeline, provider
+  abstraction, versioned prompts, and the evaluation gate
 - [Domain model](domain-model.md) · [Events](events.md) · [Data flow](data-flow.md)
 - [REST API](api.md) · [Conventions](conventions.md) · [Operations](operations.md)
 - [Security](security.md) · [Roadmap](roadmap.md) · [Decisions (ADRs)](adr/)
@@ -85,7 +87,10 @@ engram/
 │   ├── engram-events/          Kernel: envelope, registry, serde, bus/store/projection contracts
 │   ├── engram-core/            Domain (aggregates, values, events, errors, ports) + application services
 │   ├── engram-storage-sqlite/  Canonical store: event log + state projections + Alembic
-│   └── engram-export-git/      Markdown/NDJSON exporter, git committer, inbound reconciler
+│   ├── engram-export-git/      Markdown/NDJSON exporter, git committer, inbound reconciler
+│   └── engram-intelligence/    AI layer: ingestion pipeline contracts, LLM provider port,
+│                               versioned prompts, eval harness (SDKs confined to providers/)
+├── evaluations/    Golden cases, synthetic corpus spec, committed baseline (ADR-0014)
 ├── docs/           This documentation + ADRs
 ├── docker/         Optional container setup (local-first: not required)
 └── .github/        CI, templates, dependabot
@@ -99,14 +104,17 @@ graph TD
     api --> export[libs/engram-export-git]
     cli[apps/cli] --> storage
     cli --> export
+    cli -.-> intel[libs/engram-intelligence]
     mcp[apps/mcp] -.-> core
     api --> core[libs/engram-core]
     cli --> core
     storage --> core
     export --> core
+    intel --> core
     core --> events[libs/engram-events]
     storage --> events
     export --> events
+    intel --> events
     api --> events
     web[apps/web] --> client[packages/api-client]
     client -. generated from .-> api

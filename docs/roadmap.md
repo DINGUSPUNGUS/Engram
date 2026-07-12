@@ -17,6 +17,15 @@ entity resolution. Skeleton rebound to the model: kind schemas + KindRegistry, s
 values, extended event taxonomy, spine-carrying storage schema and API contracts.
 Invariant established: the data model is stable before feature code exists.
 
+## Phase 0.75 — Intelligence architecture ✅
+
+[intelligence.md](intelligence.md): the nine-stage ingestion pipeline (conversation →
+Proposal, never a direct write), the `LLMProvider` port with vendor SDKs confined to
+adapters (ADR-0012), prompts as versioned immutable artifacts (ADR-0013), and the
+evaluation gate with golden sets, synthetic corpus taxonomy, and committed baseline
+(ADR-0014). `libs/engram-intelligence` binds the contracts; `evaluations/` exists from
+day 0. Invariant established: no AI-affecting change merges below baseline.
+
 ## Phase 1 — The event core
 
 SQLite event store (append, optimistic concurrency, read), Memory aggregate fold/decide
@@ -55,11 +64,15 @@ MCP server (`engram_search/recall/remember/forget/timeline`), provenance per ass
 integration guides for Claude/Cursor/ChatGPT/Ollama. Invariant: MCP is a thin shell over
 the same services (ADR-0007).
 
-## Phase 8 — Intelligence
+## Phase 8 — Intelligence (implements Phase 0.75's contracts)
 
-Automatic memory extraction (behind proposals — extraction *proposes*, humans approve),
-decay scoring from `MemoryAccessed` history, duplicate detection via `supersedes`/
-`contradicts`, graph visualization in the dashboard.
+The ingestion pipeline lands stage by stage against the interfaces in
+`libs/engram-intelligence` ([intelligence.md](intelligence.md)): Ollama provider first
+(local-first reference), then evidence extraction → entity resolution → candidate
+generation → conflict detection, each gated by the golden suite (ADR-0014). Plus decay
+scoring from `MemoryAccessed` history, the synthetic-corpus generator, duplicate
+detection via `supersedes`/`contradicts`, and graph visualization in the dashboard.
+Extraction *proposes*, humans approve — always.
 
 ## Phase 9 — Ecosystem
 

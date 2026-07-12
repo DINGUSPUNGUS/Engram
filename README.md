@@ -49,6 +49,8 @@ tables      later)                   │
 | `libs/engram-core` | Domain aggregates, value objects, ports; application command/query services. |
 | `libs/engram-storage-sqlite` | Canonical store: SQLModel event store + state projections + Alembic migrations. |
 | `libs/engram-export-git` | Markdown/NDJSON export projector, git committer, inbound reconciler. |
+| `libs/engram-intelligence` | AI layer: ingestion pipeline contracts, LLM provider port (SDKs confined to `providers/`), versioned prompts, eval harness. |
+| `evaluations/` | Golden cases + synthetic corpus spec + the committed quality baseline. |
 | `apps/api` | FastAPI REST server (thin shell over application services). |
 | `apps/cli` | `engram` command-line interface (Typer). |
 | `apps/mcp` | MCP server (stub — roadmap phase 7). |
@@ -73,6 +75,8 @@ no accounts, no telemetry.
 ## Documentation
 
 - [Architecture](docs/architecture.md) — the full picture, including a self-critique
+- [The Memory Model](docs/memory-model.md) — twelve typed kinds + the justification spine
+- [Intelligence](docs/intelligence.md) — ingestion pipeline, provider port, prompts, evals
 - [Domain model](docs/domain-model.md) · [Events](docs/events.md) · [Data flow](docs/data-flow.md)
 - [REST API](docs/api.md) · [Conventions](docs/conventions.md) · [Operations](docs/operations.md)
 - [Security](docs/security.md) · [Roadmap](docs/roadmap.md) · [ADRs](docs/adr/)
