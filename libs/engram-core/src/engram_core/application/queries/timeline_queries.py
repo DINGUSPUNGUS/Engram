@@ -19,4 +19,4 @@ class TimelineQueryService:
         Raises:
             NotFoundError: unknown memory.
         """
-        raise NotImplementedError
+        return self._query.timeline(memory_id)

@@ -17,7 +17,7 @@ class MemoryQueryService:
         Raises:
             NotFoundError: unknown or deleted memory.
         """
-        raise NotImplementedError
+        return self._query.get(memory_id)
 
     def list_memories(
         self,
@@ -29,6 +29,14 @@ class MemoryQueryService:
         cursor: str | None = None,
         limit: int = 50,
     ) -> Page[MemoryReadModel]:
-        """Cursor-paginated listing with optional filters. Visibility is enforced
-        here — the caller's principal decides what may be returned."""
-        raise NotImplementedError
+        """Cursor-paginated listing with optional filters. Visibility enforcement
+        against the caller's principal arrives with the auth milestone; today every
+        caller is the owning user."""
+        return self._query.list_memories(
+            kind=kind,
+            tag=tag,
+            include_archived=include_archived,
+            include_stale=include_stale,
+            cursor=cursor,
+            limit=limit,
+        )

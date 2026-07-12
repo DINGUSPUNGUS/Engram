@@ -53,6 +53,18 @@ class Slug:
         return self.value
 
 
+def derive_slug(title: str, entropy: str) -> Slug:
+    """Derive a valid, practically-unique slug from a title.
+
+    ``entropy`` (e.g. the first hex chars of the memory's UUIDv7) is appended so
+    auto-derived slugs never collide; user-supplied slugs skip this path.
+    """
+    normalized = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+    suffix = re.sub(r"[^a-z0-9]", "", entropy.lower())[:8] or "0"
+    base = normalized[: _SLUG_MAX_LENGTH - len(suffix) - 1].rstrip("-")
+    return Slug(f"{base}-{suffix}" if base else suffix)
+
+
 class MemoryKind(StrEnum):
     """The twelve first-class memory kinds (memory-model.md §1-2, ADR-0008).
 

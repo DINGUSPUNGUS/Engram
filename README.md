@@ -1,7 +1,9 @@
 # engram
 
-> **Status: pre-alpha — architecture phase.** The skeleton you see here is real and CI-green,
-> but every service body is intentionally a stub. Nothing stores memories yet.
+> **Status: pre-alpha.** The event core works: `engram init / add / list / show / rebuild`
+> store real, typed, replayable memories in an append-only event log. Search, the REST
+> surface, the markdown/git export, proposals, and the AI pipeline land phase by phase
+> ([roadmap](docs/roadmap.md)).
 
 **engram** is a local-first, user-owned memory engine for AI assistants. It lets ChatGPT,
 Claude, Gemini, Cursor, Copilot, Ollama, and anything else that speaks MCP or REST share a
@@ -73,9 +75,17 @@ Prerequisites: [Node 22+](https://nodejs.org), [pnpm 9+](https://pnpm.io),
 [uv](https://docs.astral.sh/uv/) (uv installs Python 3.13 for you).
 
 ```sh
-pnpm install       # JS workspace
-uv sync            # Python workspace (creates .venv, fetches Python 3.13 if needed)
-pnpm dev           # API on :8000, web on :3000
+pnpm install                 # JS workspace
+uv sync --all-packages       # Python workspace (fetches Python 3.13 if needed)
+
+uv run engram init           # create your memory space (~/.engram)
+uv run engram add fact "I prefer dark mode" -t ui
+uv run engram add project myapp --attr name=myapp --attr status=active
+uv run engram list
+uv run engram show <id>      # full state + event timeline
+uv run engram rebuild        # drop projections, replay the log — same state
+
+pnpm dev                     # API on :8000, web on :3000 (route stubs until phase 3)
 ```
 
 Everything runs locally. No Docker required (compose files exist for convenience), no cloud,

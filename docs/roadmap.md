@@ -31,11 +31,14 @@ day 0. Invariant established: no AI-affecting change merges below baseline.
 > their place by solving a concrete problem discovered during implementation — not by
 > speculation.
 
-## Phase 1 — The event core
+## Phase 1 — The event core ✅
 
-SQLite event store (append, optimistic concurrency, read), Memory aggregate fold/decide
-(kind-schema validation via KindRegistry), memory command/query services, state
-projection, `engram init/add/list/show`. Invariant: replay determinism test green.
+SQLite event store (append, optimistic concurrency, typed payload codec), Memory
+aggregate fold/evolve/decide for the narrative core (create/edit/tag/archive/restore/
+delete/access — spine and link commands keep their contracts and land with phases 3–5),
+command/query services, the state projection with checkpointed idempotent apply,
+`engram init/add/list/show/rebuild`. **Invariant green**: the replay-determinism test
+drives the full write path, resets, replays, and asserts identical state.
 
 ## Phase 2 — Search & rebuild
 

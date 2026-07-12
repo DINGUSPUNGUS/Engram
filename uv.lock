@@ -225,6 +225,7 @@ dependencies = [
     { name = "engram-events" },
     { name = "engram-export-git" },
     { name = "engram-storage-sqlite" },
+    { name = "pydantic-settings" },
     { name = "typer" },
 ]
 
@@ -234,6 +235,7 @@ requires-dist = [
     { name = "engram-events", editable = "libs/engram-events" },
     { name = "engram-export-git", editable = "libs/engram-export-git" },
     { name = "engram-storage-sqlite", editable = "libs/engram-storage-sqlite" },
+    { name = "pydantic-settings", specifier = ">=2.7.0" },
     { name = "typer", specifier = ">=0.15.0" },
 ]
 

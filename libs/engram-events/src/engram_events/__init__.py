@@ -6,6 +6,7 @@ memories, SQLite, git, or HTTP, and it must never import another engram package.
 """
 
 from engram_events.bus import EventBus, EventHandler, InProcessEventBus
+from engram_events.clock import SystemClock
 from engram_events.envelope import EventEnvelope, Provenance
 from engram_events.ids import new_uuid7
 from engram_events.projection import Projection
@@ -28,6 +29,7 @@ __all__ = [
     "OptimisticConcurrencyError",
     "Projection",
     "Provenance",
+    "SystemClock",
     "UnknownEventTypeError",
     "deserialize_payload",
     "new_uuid7",

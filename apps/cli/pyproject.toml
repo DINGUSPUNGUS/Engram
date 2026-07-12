@@ -9,6 +9,7 @@ dependencies = [
     "engram-storage-sqlite",
     "engram-export-git",
     "typer>=0.15.0",
+    "pydantic-settings>=2.7.0",
 ]
 
 [project.scripts]
