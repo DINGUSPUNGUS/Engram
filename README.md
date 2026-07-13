@@ -1,10 +1,11 @@
 # engram
 
-> **Status: pre-alpha.** The event core works (M1) and so does the query engine (M2):
-> `engram init / add / list / show / search / status / rebuild` store and query real,
-> typed, replayable memories — including time travel (`show --at`). The markdown/git
-> export, proposals, the AI pipeline, and the surfaces land milestone by milestone
-> ([roadmap](docs/roadmap.md)).
+> **Status: pre-alpha.** The event core works (M1), the query engine works (M2), and
+> the space is now **portable** (M3): `engram export` produces a deterministic,
+> checksummed markdown+NDJSON repository; `engram import --restore` losslessly
+> reconstitutes it anywhere; edited files come back as *proposals*; `engram git`
+> versions it all. Proposals review, the AI pipeline, and the surfaces land milestone
+> by milestone ([roadmap](docs/roadmap.md)).
 
 **engram** is a local-first, user-owned memory engine for AI assistants. It lets ChatGPT,
 Claude, Gemini, Cursor, Copilot, Ollama, and anything else that speaks MCP or REST share a
@@ -89,6 +90,11 @@ uv run engram show <id> --version 1   # time travel: the memory as it first exis
 uv run engram status         # event log totals + projection drift detection
 uv run engram rebuild        # drop projections, replay the log — same state
 
+uv run engram export         # deterministic markdown+NDJSON repo (~/.engram/memory)
+uv run engram git init       # version it; `engram git commit` = export + commit
+uv run engram import ./notes.md          # validated → opens a PROPOSAL, never a write
+uv run engram import --restore <repo>    # rebuild an empty space losslessly
+
 pnpm dev                     # API on :8000, web on :3000 (route stubs until M7)
 ```
 
@@ -99,6 +105,7 @@ no accounts, no telemetry.
 
 - [Architecture](docs/architecture.md) — the full picture, including a self-critique
 - [The Memory Model](docs/memory-model.md) — twelve typed kinds + the justification spine
+- [The Export Format](docs/export-format.md) — the portable repository: markdown, NDJSON, manifest, restore vs import
 - [Intelligence](docs/intelligence.md) — ingestion pipeline, provider port, prompts, evals
 - [Domain model](docs/domain-model.md) · [Events](docs/events.md) · [Data flow](docs/data-flow.md)
 - [REST API](docs/api.md) · [Conventions](docs/conventions.md) · [Operations](docs/operations.md)

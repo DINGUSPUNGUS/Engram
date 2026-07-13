@@ -73,6 +73,7 @@ class MemoryRecord(SQLModel, table=True):
     lifetime_until: datetime | None = None
     visibility: str = Field(default="shared", index=True)
     allowed_actors: str = Field(default="[]", description="JSON list; RESTRICTED only")
+    created_by: str = Field(default="user", description="Actor of MemoryCreated (provenance)")
     pinned: bool = Field(default=False, index=True)
     user_weight: float | None = None
     archived: bool = Field(default=False, index=True)

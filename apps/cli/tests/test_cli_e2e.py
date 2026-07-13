@@ -15,10 +15,21 @@ from engram_cli.main import app
 runner = CliRunner()
 
 
+def _extract_id(output: str) -> str:
+    match = re.search(r"id: ([0-9a-f-]{36})", output)
+    assert match, output
+    return match.group(1)
+
+
 @pytest.fixture
 def space(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("ENGRAM_DATA_DIR", str(tmp_path / "engram"))
     monkeypatch.setenv("ENGRAM_DB_PATH", str(tmp_path / "engram" / "engram.db"))
+    monkeypatch.setenv("ENGRAM_EXPORT_REPO", str(tmp_path / "engram" / "memory"))
+    for variable in ("GIT_AUTHOR_NAME", "GIT_COMMITTER_NAME"):
+        monkeypatch.setenv(variable, "engram-test")
+    for variable in ("GIT_AUTHOR_EMAIL", "GIT_COMMITTER_EMAIL"):
+        monkeypatch.setenv(variable, "test@engram.local")
     return tmp_path / "engram"
 
 
@@ -139,3 +150,72 @@ def test_query_engine_status_and_time_travel(space: Path) -> None:
     assert result.exit_code == 0, result.output
     result = runner.invoke(app, ["search", "dark"])
     assert "User prefers dark mode" in result.output
+
+
+@pytest.mark.integration
+def test_export_git_and_restore_round_trip(space: Path, tmp_path: Path) -> None:
+    """M3 end to end: deterministic export, git versioning, lossless restore,
+    and proposal-only import — all through the real binary surface."""
+    assert runner.invoke(app, ["init"]).exit_code == 0
+
+    result = runner.invoke(
+        app, ["add", "project", "engram", "-a", "name=engram", "-a", "status=active", "-t", "oss"]
+    )
+    project_id = _extract_id(result.output)
+    result = runner.invoke(app, ["add", "fact", "User prefers dark mode", "-t", "ui"])
+    fact_id = _extract_id(result.output)
+    assert runner.invoke(app, ["link", fact_id, project_id, "about"]).exit_code == 0
+
+    # -- deterministic export ----------------------------------------------------
+    repo = space / "memory"
+    result = runner.invoke(app, ["export"])
+    assert result.exit_code == 0, result.output
+    assert (repo / "manifest.json").exists()
+    assert (repo / "timeline" / "events.ndjson").exists()
+    fact_files = list((repo / "memory" / "facts").glob("*.md"))
+    assert len(fact_files) == 1
+    document = fact_files[0].read_text(encoding="utf-8")
+    assert f'id: "{fact_id}"' in document
+    assert f'target: "{project_id}"' in document
+
+    result = runner.invoke(app, ["export"])
+    assert "unchanged" in result.output  # repeated export touches nothing
+
+    # -- git consumes exports ------------------------------------------------------
+    assert runner.invoke(app, ["git", "init"]).exit_code == 0
+    result = runner.invoke(app, ["git", "commit"])
+    assert result.exit_code == 0, result.output
+    assert "committed" in result.output
+    result = runner.invoke(app, ["git", "status"])
+    assert "clean" in result.output
+
+    # -- lossless restore into a brand-new space ----------------------------------
+    reborn_db = tmp_path / "reborn" / "engram.db"
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setenv("ENGRAM_DB_PATH", str(reborn_db))
+        patch.setenv("ENGRAM_DATA_DIR", str(tmp_path / "reborn"))
+        assert runner.invoke(app, ["init"]).exit_code == 0
+        result = runner.invoke(app, ["import", str(repo), "--restore"])
+        assert result.exit_code == 0, result.output
+        assert "restored 3 events" in result.output
+        result = runner.invoke(app, ["show", fact_id])
+        assert result.exit_code == 0, result.output
+        assert "User prefers dark mode" in result.output
+        assert "MemoryLinked" in result.output
+
+        # Restore refuses to run twice (the space is no longer empty).
+        result = runner.invoke(app, ["import", str(repo), "--restore"])
+        assert result.exit_code == 1
+        assert "non-empty" in result.output
+
+    # -- external knowledge only enters as a proposal ------------------------------
+    note = tmp_path / "note.md"
+    note.write_text(
+        '---\nkind: "fact"\ntitle: "Imported note"\nattributes:\n  statement: "hello"\n---\nbody\n',
+        encoding="utf-8",
+    )
+    result = runner.invoke(app, ["import", str(note)])
+    assert result.exit_code == 0, result.output
+    assert "opened proposal" in result.output
+    result = runner.invoke(app, ["list"])
+    assert "Imported note" not in result.output  # pending review, not memory

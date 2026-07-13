@@ -40,17 +40,27 @@ projection. Also: `engram status` with projection drift detection, and **time tr
 was (a developer's debugging tool that falls straight out of ADR-0002).
 Invariant: dropping any projection table is fully recoverable (`engram rebuild`).
 
-## M3 — Git Export
+## M3 — Git Export & Interoperability ✅
 
-Markdown + NDJSON export projector, git committing, `engram export`, import/reconciler
-for external edits. Invariant: clone + rebuild round-trip is lossless (CI-tested).
+Not "export markdown": prove the event store can produce a completely portable,
+human-editable repository with deterministic reconstruction (ADR-0017,
+[export-format.md](export-format.md)). Deterministic `engram export`
+(markdown + NDJSON + checksummed manifest with a Merkle-style root; repeated exports
+touch nothing), `engram import` (exhaustive validation → **proposals**, never direct
+writes) and `engram import --restore` (verbatim event-log reconstitution into an empty
+space), `engram git init|status|commit` (git consumes exports, never mutates runtime
+state), plus links + evidence command paths (portability demanded they exist in the
+log). **Invariant green**: export → delete database → restore → rebuild reproduces
+identical events and identical state, and re-exports to an identical merkle root.
 
 ## M4 — Proposal Workflow
 
-Proposals end-to-end (open/approve/reject/merge with conflict detection), the spine
-commands (confirm/contradict/evidence/importance/visibility/lifetime), links, merge
-tooling, undo. Invariant: no proposal merge ever silently overwrites; automation opens
-proposals, never events.
+Proposals end-to-end (approve/reject/merge with conflict detection — open landed in M3
+as the importer's front door), the remaining spine commands (confirm/contradict/
+importance/visibility/lifetime), merge tooling, undo, and the markdown reconciler
+(targeted `MemoryEditedExternally` drafts instead of whole-memory imports).
+Invariant: no proposal merge ever silently overwrites; automation opens proposals,
+never events.
 
 ## M5 — Intelligence Pipeline
 

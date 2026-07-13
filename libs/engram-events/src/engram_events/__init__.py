@@ -15,7 +15,12 @@ from engram_events.registry import (
     EventTypeAlreadyRegisteredError,
     UnknownEventTypeError,
 )
-from engram_events.serde import deserialize_payload, serialize_payload
+from engram_events.serde import (
+    deserialize_payload,
+    deserialize_payload_json,
+    serialize_payload,
+    serialize_payload_json,
+)
 from engram_events.store import EventStore, OptimisticConcurrencyError
 
 __all__ = [
@@ -32,6 +37,8 @@ __all__ = [
     "SystemClock",
     "UnknownEventTypeError",
     "deserialize_payload",
+    "deserialize_payload_json",
     "new_uuid7",
     "serialize_payload",
+    "serialize_payload_json",
 ]

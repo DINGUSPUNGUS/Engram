@@ -1,6 +1,7 @@
 """The ``engram`` command. Real since M1: init, add, list, show, rebuild.
-Real since M2: search (the query language), status (drift detection), and time
-travel (``show --at`` / ``show --version``). Export lands with M3.
+M2: search (the query language), status (drift detection), time travel
+(``show --at`` / ``show --version``). M3: export, import (proposals or
+--restore), link, and the ``git`` subcommands.
 
 Exit-code contract: 0 success · 1 expected failure (mapped EngramError) ·
 2 usage error (Typer's default) · 70 unexpected internal error.
@@ -8,6 +9,7 @@ Exit-code contract: 0 success · 1 expected failure (mapped EngramError) ·
 
 from collections.abc import Callable
 from datetime import datetime
+from pathlib import Path
 from typing import Annotated
 from uuid import UUID
 
@@ -18,8 +20,9 @@ from engram_cli.config import CliSettings
 from engram_cli.runtime import Runtime, build_runtime
 from engram_core.application.dto import CreateMemoryInput, MemoryReadModel
 from engram_core.domain.errors import EngramError, ValidationError
-from engram_core.domain.values import MemoryId, MemoryKind
+from engram_core.domain.values import LinkRelation, MemoryId, MemoryKind
 from engram_events import Provenance
+from engram_export_git.repo import GitVersionControl
 from engram_storage_sqlite.migrate import upgrade_to_head
 
 app = typer.Typer(
@@ -27,13 +30,6 @@ app = typer.Typer(
     help="Git-native, event-sourced, user-owned memory for AI assistants.",
     no_args_is_help=True,
 )
-
-_NOT_IMPLEMENTED = "this command is specified but lands with a later milestone (docs/roadmap.md)."
-
-
-def _fail(message: str) -> None:
-    typer.secho(message, fg=typer.colors.RED, err=True)
-    raise typer.Exit(code=1)
 
 
 def _run[T](action: Callable[[], T]) -> T:
@@ -299,9 +295,164 @@ def status() -> None:
 
 
 @app.command()
-def export() -> None:
-    """Force a full markdown + NDJSON export to the git repository."""
-    _fail(_NOT_IMPLEMENTED)
+def export(
+    output: Annotated[
+        Path | None, typer.Option("--output", "-o", help="Target directory (default: space repo)")
+    ] = None,
+    export_format: Annotated[
+        str, typer.Option("--format", "-f", help="markdown | ndjson | all")
+    ] = "all",
+    incremental: Annotated[
+        bool, typer.Option("--incremental", help="Extend events.ndjson instead of rewriting")
+    ] = False,
+) -> None:
+    """Export the space to a portable repository: markdown + NDJSON + manifest.
+
+    Deterministic: repeated exports without changes touch nothing.
+    """
+
+    def action() -> None:
+        runtime = _runtime()
+        root = output if output is not None else CliSettings().resolved_export_repo
+        report = runtime.exporter.export(root, export_format=export_format, incremental=incremental)
+        if not report.changed:
+            typer.secho(f"export unchanged: {root}", fg=typer.colors.GREEN)
+            return
+        typer.secho(
+            f"exported to {root}: {len(report.written)} written,"
+            f" {len(report.deleted)} removed, {len(report.unchanged)} unchanged",
+            fg=typer.colors.GREEN,
+        )
+        counts = report.manifest.counts
+        typer.echo(
+            f"memories: {counts.get('memories', 0)}   events: {counts.get('events', 0)}"
+            f"   merkle: {report.manifest.merkle_root[:16]}…"
+        )
+
+    _run(action)
+
+
+@app.command(name="import")
+def import_(
+    source: Annotated[Path, typer.Argument(help="Export repo, directory, .md, or .ndjson")],
+    restore: Annotated[
+        bool,
+        typer.Option(
+            "--restore",
+            help="Reconstitute the event log verbatim (empty space only) instead of proposing",
+        ),
+    ] = False,
+    title: Annotated[str | None, typer.Option(help="Proposal title")] = None,
+) -> None:
+    """Import memories. Default: validate and open a PROPOSAL — nothing changes
+    memory until a human approves it. --restore rebuilds an empty space from an
+    exported event log (the lossless round-trip path)."""
+
+    def action() -> None:
+        runtime = _runtime()
+        if restore:
+            report = runtime.importer.restore(source)
+            replayed = runtime.rebuild()
+            typer.secho(
+                f"restored {report.events} events across {report.streams} streams;"
+                f" projections rebuilt from {replayed} events",
+                fg=typer.colors.GREEN,
+            )
+            return
+        result = runtime.importer.import_documents(source, _provenance(), title=title)
+        typer.secho(
+            f"opened proposal {result.proposal_id}: {result.memories} memories,"
+            f" {result.links} links, {result.evidence} evidence entries",
+            fg=typer.colors.GREEN,
+        )
+        typer.echo("review and merge it when the proposal workflow lands (M4)")
+
+    _run(action)
+
+
+@app.command()
+def link(
+    source_id: Annotated[UUID, typer.Argument(help="Source memory UUID")],
+    target_id: Annotated[UUID, typer.Argument(help="Target memory UUID")],
+    relation: Annotated[str, typer.Argument(help="about|involves|part_of|owned_by|…")],
+) -> None:
+    """Create a typed edge between two memories (tier-1 graph, ADR-0010)."""
+
+    def action() -> None:
+        runtime = _runtime()
+        try:
+            resolved = LinkRelation(relation)
+        except ValueError:
+            raise ValidationError(
+                f"unknown relation {relation!r}; one of: " + ", ".join(sorted(set(LinkRelation)))
+            ) from None
+        runtime.commands.link_memories(
+            MemoryId(source_id), MemoryId(target_id), resolved, _provenance()
+        )
+        typer.secho(f"linked {source_id} -{relation}-> {target_id}", fg=typer.colors.GREEN)
+
+    _run(action)
+
+
+git_app = typer.Typer(name="git", help="Version the export repository (git consumes exports).")
+app.add_typer(git_app)
+
+
+def _vcs() -> "GitVersionControl":
+    return GitVersionControl(CliSettings().resolved_export_repo)
+
+
+@git_app.command(name="init")
+def git_init() -> None:
+    """Initialize the export repository as a git repo (idempotent)."""
+
+    def action() -> None:
+        root = CliSettings().resolved_export_repo
+        vcs = _vcs()
+        vcs.init()
+        typer.secho(f"git repository ready: {root}", fg=typer.colors.GREEN)
+
+    _run(action)
+
+
+@git_app.command(name="status")
+def git_status() -> None:
+    """Show uncommitted changes in the export repository."""
+
+    def action() -> None:
+        changes = _vcs().status()
+        if not changes:
+            typer.echo("clean — the committed export matches the working tree")
+            return
+        for line in changes:
+            typer.echo(line)
+
+    _run(action)
+
+
+@git_app.command(name="commit")
+def git_commit(
+    message: Annotated[str | None, typer.Option("--message", "-m")] = None,
+) -> None:
+    """Export, then commit the export repository. Never touches runtime state."""
+
+    def action() -> None:
+        runtime = _runtime()
+        root = CliSettings().resolved_export_repo
+        report = runtime.exporter.export(root)
+        vcs = _vcs()
+        counts = report.manifest.counts
+        sha = vcs.commit(
+            (),
+            message
+            or (
+                f"engram export: {counts.get('memories', 0)} memories,"
+                f" {counts.get('events', 0)} events (head #{report.manifest.head_global_seq})"
+            ),
+        )
+        typer.secho(f"committed {sha[:12]}", fg=typer.colors.GREEN)
+
+    _run(action)
 
 
 def _runtime() -> Runtime:

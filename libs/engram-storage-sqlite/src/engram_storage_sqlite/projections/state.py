@@ -6,6 +6,7 @@ transaction — replaying the whole log always lands on the same rows
 (the M1 invariant, CI-tested).
 """
 
+from sqlalchemy import func
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlmodel import Session, col, delete, select
@@ -98,6 +99,7 @@ class StateProjection:
                             to_naive_utc(payload.lifetime_until) if payload.lifetime_until else None
                         ),
                         visibility=payload.visibility,
+                        created_by=envelope.provenance.actor,
                         created_at=occurred,
                         updated_at=occurred,
                         version=envelope.stream_seq,
@@ -144,6 +146,50 @@ class StateProjection:
                 existing = session.get(MemoryRecord, stream_id)
                 if existing is not None:
                     session.delete(existing)
+            case ev.MemoryLinked():
+                key = (stream_id, str(payload.target_id), payload.relation)
+                if session.get(LinkRecord, key) is None:
+                    session.add(
+                        LinkRecord(
+                            source_id=stream_id,
+                            target_id=str(payload.target_id),
+                            relation=payload.relation,
+                        )
+                    )
+                record = self._memory_row(session, stream_id)
+                record.updated_at = occurred
+                record.version = envelope.stream_seq
+                session.add(record)
+            case ev.MemoryUnlinked():
+                edge = session.get(
+                    LinkRecord, (stream_id, str(payload.target_id), payload.relation)
+                )
+                if edge is not None:
+                    session.delete(edge)
+                record = self._memory_row(session, stream_id)
+                record.updated_at = occurred
+                record.version = envelope.stream_seq
+                session.add(record)
+            case ev.MemoryEvidenceAdded():
+                count = session.exec(
+                    select(func.count())
+                    .select_from(EvidenceRecord)
+                    .where(col(EvidenceRecord.memory_id) == stream_id)
+                ).one()
+                session.add(
+                    EvidenceRecord(
+                        memory_id=stream_id,
+                        seq=int(count) + 1,
+                        evidence_type=payload.evidence_type,
+                        value=payload.value,
+                        note=payload.note,
+                        added_at=occurred,
+                        actor=envelope.provenance.actor,
+                    )
+                )
+                record = self._memory_row(session, stream_id)
+                record.version = envelope.stream_seq
+                session.add(record)
             case ev.MemoryAccessed():
                 record = self._memory_row(session, stream_id)
                 record.version = envelope.stream_seq

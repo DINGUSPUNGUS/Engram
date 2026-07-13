@@ -75,7 +75,10 @@ class SqliteProposalRepository:
         self._store = store
 
     def load(self, proposal_id: ProposalId) -> Proposal:
-        raise NotImplementedError
+        envelopes = self._store.read_stream(proposal_id)
+        if not envelopes:
+            raise NotFoundError(f"no such proposal: {proposal_id}")
+        return Proposal.fold(envelopes)
 
     def append(self, envelopes: Sequence[EventEnvelope]) -> Sequence[EventEnvelope]:
         return self._store.append(envelopes)

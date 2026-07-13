@@ -162,7 +162,20 @@ class MarkdownSync(Protocol):
 
 
 class VersionControl(Protocol):
-    """Thin git facade used by the exporter. Wraps GitPython in the adapter."""
+    """Thin git facade over the export repository. Wraps GitPython in the adapter.
+
+    Git is a consumer of exported state (ADR-0017): nothing behind this port may
+    mutate runtime state."""
+
+    def is_repo(self) -> bool: ...
+
+    def init(self) -> None:
+        """Create the repository if absent (idempotent)."""
+        ...
+
+    def status(self) -> Sequence[str]:
+        """Changed/untracked paths (porcelain-style lines)."""
+        ...
 
     def commit(self, paths: Sequence[Path], message: str) -> str:
         """Stage and commit; returns the commit sha."""

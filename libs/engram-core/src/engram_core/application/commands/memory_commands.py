@@ -27,6 +27,7 @@ from engram_core.domain.ports import Clock, MemoryRepository
 from engram_core.domain.values import (
     EvidenceRef,
     Lifetime,
+    Link,
     LinkRelation,
     MemoryId,
     Slug,
@@ -218,8 +219,9 @@ class MemoryCommandService:
     def add_evidence(
         self, memory_id: MemoryId, evidence: EvidenceRef, provenance: Provenance
     ) -> None:
-        """Append supporting evidence (M4)."""
-        raise NotImplementedError
+        """Append supporting evidence (justification spine, append-only)."""
+        memory = self._repository.load(memory_id)
+        self._commit(memory_id, memory.version, memory.decide_add_evidence(evidence), provenance)
 
     def adjust_importance(
         self,
@@ -253,8 +255,16 @@ class MemoryCommandService:
         relation: LinkRelation,
         provenance: Provenance,
     ) -> None:
-        """Create a typed tier-1 edge (M4)."""
-        raise NotImplementedError
+        """Create a typed tier-1 edge (ADR-0010, canonical direction).
+
+        Raises:
+            NotFoundError: either end is unknown or deleted.
+            ValidationError: self-link.
+        """
+        source = self._repository.load(source_id)
+        self._repository.load(target_id)  # existence check; deleted targets refuse
+        payloads = source.decide_link(Link(target_id, relation))
+        self._commit(source_id, source.version, payloads, provenance)
 
     def merge_memories(
         self,

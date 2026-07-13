@@ -12,7 +12,13 @@ from engram_export_git.layout import memory_relpath, resolve_inside
 @pytest.mark.unit
 def test_memory_relpath_is_kind_sharded() -> None:
     relpath = memory_relpath(MemoryKind.PREFERENCE, Slug("kahnya-branding"))
-    assert relpath == PurePosixPath("memories/preference/kahnya-branding.md")
+    assert relpath == PurePosixPath("memory/preferences/kahnya-branding.md")
+
+
+@pytest.mark.unit
+def test_every_kind_has_a_directory() -> None:
+    paths = {memory_relpath(kind, Slug("x")) for kind in MemoryKind}
+    assert len(paths) == len(MemoryKind)  # no two kinds share a directory
 
 
 @pytest.mark.unit

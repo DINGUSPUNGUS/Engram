@@ -62,6 +62,7 @@ class MemoryReadModel:
     pinned: bool
     user_weight: float | None
     archived: bool
+    created_by: str
     created_at: datetime
     updated_at: datetime
     version: int

@@ -6,9 +6,9 @@ through the KindRegistry — and return the event payloads to append. They never
 mutate anything themselves.
 
 M1 implemented the narrative core: create, edit, tag, archive/restore, delete,
-record-access. The spine commands (confirm/contradict/evidence/importance/
-visibility/lifetime), links, and merge keep their contracts as stubs and land
-with M4.
+record-access. M3 added links and evidence (portability demands they exist in the
+log). The remaining spine commands (confirm/contradict/importance/visibility/
+lifetime) and merge keep their contracts as stubs and land with M4.
 """
 
 import dataclasses
@@ -21,9 +21,11 @@ from engram_core.domain.errors import ConflictError, ValidationError
 from engram_core.domain.kinds import KindAttributes, KindRegistry
 from engram_core.domain.values import (
     EvidenceRef,
+    EvidenceType,
     ImportanceSignals,
     Lifetime,
     Link,
+    LinkRelation,
     MemoryId,
     MemoryKind,
     RetentionPolicy,
@@ -146,6 +148,17 @@ class Memory:
                     changes["slug"] = Slug(payload.slug)
             case ev.MemoryTagged():
                 changes = {"tags": (self.tags | set(payload.added)) - set(payload.removed)}
+            case ev.MemoryLinked():
+                link = Link(MemoryId(payload.target_id), LinkRelation(payload.relation))
+                changes = {"links": (*self.links, link)} if link not in self.links else {}
+            case ev.MemoryUnlinked():
+                gone = Link(MemoryId(payload.target_id), LinkRelation(payload.relation))
+                changes = {"links": tuple(link for link in self.links if link != gone)}
+            case ev.MemoryEvidenceAdded():
+                added = EvidenceRef(
+                    EvidenceType(payload.evidence_type), payload.value, payload.note
+                )
+                changes = {"evidence": (*self.evidence, added)}
             case ev.MemoryArchived():
                 changes = {"archived": True}
             case ev.MemoryRestored():
@@ -296,8 +309,16 @@ class Memory:
         raise NotImplementedError
 
     def decide_add_evidence(self, evidence: EvidenceRef) -> Sequence[object]:
-        """Produce ``MemoryEvidenceAdded`` (M4)."""
-        raise NotImplementedError
+        """Produce ``MemoryEvidenceAdded``. Evidence is append-only — corrections
+        add more evidence, never rewrite it (memory-model.md §3)."""
+        self._require_live()
+        return (
+            ev.MemoryEvidenceAdded(
+                evidence_type=evidence.evidence_type.value,
+                value=evidence.value,
+                note=evidence.note,
+            ),
+        )
 
     def decide_adjust_importance(
         self, *, pinned: bool | None = None, user_weight: float | None = None
@@ -316,8 +337,18 @@ class Memory:
         raise NotImplementedError
 
     def decide_link(self, link: Link) -> Sequence[object]:
-        """Produce ``MemoryLinked`` (M4)."""
-        raise NotImplementedError
+        """Produce ``MemoryLinked`` (tier-1 edge, closed vocabulary — ADR-0010).
+        Linking to an already-linked target with the same relation is a no-op.
+
+        Raises:
+            ValidationError: self-link.
+        """
+        self._require_editable()
+        if link.target_id == self.id:
+            raise ValidationError("a memory cannot link to itself")
+        if link in self.links:
+            return ()
+        return (ev.MemoryLinked(target_id=link.target_id, relation=link.relation.value),)
 
     def decide_merge_from(self, source: "Memory", merged_content: str) -> Sequence[object]:
         """Produce ``MemoryMerged`` (M4)."""

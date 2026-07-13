@@ -179,6 +179,7 @@ class SqliteMemoryQuery:
             pinned=record.pinned,
             user_weight=record.user_weight,
             archived=record.archived,
+            created_by=record.created_by,
             created_at=from_naive_utc(record.created_at),
             updated_at=from_naive_utc(record.updated_at),
             version=record.version,

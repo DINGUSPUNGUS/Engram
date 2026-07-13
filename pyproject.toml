@@ -18,6 +18,7 @@ dev = [
     "pytest-cov>=6.0.0",
     "httpx>=0.28.0",
     "import-linter>=2.1",
+    "types-pyyaml>=6.0.12.20260518",
 ]
 
 # ---------------------------------------------------------------------------
@@ -64,6 +65,9 @@ python_version = "3.13"
 strict = true
 warn_unreachable = true
 show_error_codes = true
+# Multiple packages ship a tests/conftest.py; without __init__.py they collide as
+# one top-level module name. Fixtures are pytest-injected, never imported — skip them.
+exclude = 'tests[\\/]conftest\.py$'
 
 [[tool.mypy.overrides]]
 module = ["git.*", "sqlmodel.*", "alembic.*"]
