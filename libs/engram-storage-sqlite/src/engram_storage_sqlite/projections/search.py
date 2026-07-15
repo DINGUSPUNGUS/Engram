@@ -30,7 +30,8 @@ class SearchProjection:
         return _NAME
 
     def handles(self, event_type: str) -> bool:
-        return event_type.startswith("Memory")
+        # Observe everything so the checkpoint tracks the whole log (see state.py).
+        return True
 
     def apply(self, envelope: EventEnvelope) -> None:
         if envelope.global_seq is None:

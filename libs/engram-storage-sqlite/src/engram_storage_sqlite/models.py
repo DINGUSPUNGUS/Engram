@@ -115,6 +115,23 @@ class LinkRecord(SQLModel, table=True):
     relation: str = Field(primary_key=True)
 
 
+class ProposalRecord(SQLModel, table=True):
+    """Review-queue listing of one proposal. Drafts live in its event stream."""
+
+    __tablename__ = "proposals"
+
+    id: str = Field(primary_key=True)
+    title: str
+    description: str = ""
+    status: str = Field(default="pending", index=True)
+    draft_count: int = 0
+    review_note: str | None = None
+    opened_by: str = Field(default="user")
+    created_at: datetime
+    updated_at: datetime
+    version: int = Field(default=1)
+
+
 class ProjectionCheckpointRecord(SQLModel, table=True):
     """How far each projection has folded the log."""
 

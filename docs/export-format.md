@@ -132,8 +132,16 @@ touches nothing at all (`generated_at`/`duration_ms` are frozen with it).
   knowledge: every document is validated (kind schema via the KindRegistry, UUIDs,
   link relations + targets, evidence vocabulary, timestamps, confidence range) with
   **all problems reported at once and nothing written on failure**; success opens
-  **one Proposal** carrying draft `MemoryCreated`/`MemoryLinked`/`MemoryEvidenceAdded`
-  events. Nothing imported bypasses the proposal system (ADR-0011). Merge lands M4.
+  **one Proposal** carrying draft *intents* (ADR-0018). A document whose `id`
+  already exists is **reconciled**: the current aggregate is folded from its
+  stream, the semantic difference computed, and edit intents proposed — never a
+  duplicate `MemoryCreated`; unchanged documents open nothing. Keys absent from a
+  document are not diffed (a partial hand-written file is not a removal request);
+  evidence removals are ignored (retraction is a reviewed undo, not a file edit);
+  documents for deleted memories are rejected. Nothing imported bypasses the
+  proposal system (ADR-0011): review with `engram proposals show`, then
+  `approve` + `merge` (aggregate-validated, conflict-checked, atomic), and
+  `undo` compensates a merge without ever rewriting history.
 
 ## 6. Git
 

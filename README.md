@@ -1,11 +1,11 @@
 # engram
 
-> **Status: pre-alpha.** The event core works (M1), the query engine works (M2), and
-> the space is now **portable** (M3): `engram export` produces a deterministic,
-> checksummed markdown+NDJSON repository; `engram import --restore` losslessly
-> reconstitutes it anywhere; edited files come back as *proposals*; `engram git`
-> versions it all. Proposals review, the AI pipeline, and the surfaces land milestone
-> by milestone ([roadmap](docs/roadmap.md)).
+> **Status: pre-alpha.** The event core works (M1), the query engine works (M2), the
+> space is portable (M3), and every mutation now flows through a **review pipeline**
+> (M4): external edits reconcile into edit proposals — never duplicates — and
+> `engram proposals approve/merge/undo` is the only way imported knowledge becomes
+> memory. The AI pipeline and the surfaces land milestone by milestone
+> ([roadmap](docs/roadmap.md)).
 
 **engram** is a local-first, user-owned memory engine for AI assistants. It lets ChatGPT,
 Claude, Gemini, Cursor, Copilot, Ollama, and anything else that speaks MCP or REST share a
@@ -94,6 +94,11 @@ uv run engram export         # deterministic markdown+NDJSON repo (~/.engram/mem
 uv run engram git init       # version it; `engram git commit` = export + commit
 uv run engram import ./notes.md          # validated → opens a PROPOSAL, never a write
 uv run engram import --restore <repo>    # rebuild an empty space losslessly
+
+uv run engram proposals list             # the review queue
+uv run engram proposals show <id>        # inspect every draft intent
+uv run engram proposals approve <id> && uv run engram proposals merge <id>
+uv run engram proposals undo <id>        # compensating events — history never rewritten
 
 pnpm dev                     # API on :8000, web on :3000 (route stubs until M7)
 ```

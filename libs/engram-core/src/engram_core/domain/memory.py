@@ -102,7 +102,7 @@ class Memory:
             raise ValidationError(f"stream must start with MemoryCreated, got {first.event_type}")
         memory = cls._from_created(first, kinds)
         for envelope in envelopes[1:]:
-            memory = memory.evolve(envelope)
+            memory = memory.evolve(envelope, kinds=kinds)
         return memory
 
     @classmethod
@@ -128,8 +128,12 @@ class Memory:
             version=envelope.stream_seq,
         )
 
-    def evolve(self, envelope: EventEnvelope) -> "Memory":
+    def evolve(self, envelope: EventEnvelope, *, kinds: KindRegistry | None = None) -> "Memory":
         """Return the state after one more event. Pure.
+
+        ``kinds`` is required only to fold ``MemoryAttributesUpdated`` — attributes
+        are schema-governed, so folding them needs the schema registry (``fold``
+        always passes it).
 
         Raises:
             ValidationError: event types the aggregate does not fold yet — replaying
@@ -159,6 +163,38 @@ class Memory:
                     EvidenceType(payload.evidence_type), payload.value, payload.note
                 )
                 changes = {"evidence": (*self.evidence, added)}
+            case ev.MemoryEvidenceRetracted():
+                if not 1 <= payload.seq <= len(self.evidence):
+                    raise ValidationError(
+                        f"cannot retract evidence #{payload.seq}:"
+                        f" only {len(self.evidence)} entries exist"
+                    )
+                remaining = tuple(
+                    item for index, item in enumerate(self.evidence, 1) if index != payload.seq
+                )
+                changes = {"evidence": remaining}
+            case ev.MemoryAttributesUpdated():
+                if kinds is None:
+                    raise ValidationError(
+                        "folding MemoryAttributesUpdated requires the kind registry"
+                    )
+                merged = dataclasses.asdict(self.attributes) | dict(payload.changes)
+                changes = {
+                    "attributes": kinds.parse(
+                        self.kind, merged, schema_version=payload.attributes_schema_version
+                    )
+                }
+            case ev.MemoryVisibilityChanged():
+                changes = {
+                    "visibility": Visibility(payload.visibility),
+                    "allowed_actors": tuple(payload.allowed_actors),
+                }
+            case ev.MemoryLifetimeChanged():
+                changes = {
+                    "lifetime": Lifetime(
+                        RetentionPolicy(payload.lifetime_policy), payload.lifetime_until
+                    )
+                }
             case ev.MemoryArchived():
                 changes = {"archived": True}
             case ev.MemoryRestored():
@@ -295,8 +331,30 @@ class Memory:
     def decide_update_attributes(
         self, changes: dict[str, object], kinds: KindRegistry
     ) -> Sequence[object]:
-        """Produce ``MemoryAttributesUpdated`` (M4)."""
-        raise NotImplementedError
+        """Produce ``MemoryAttributesUpdated`` for a sparse, schema-validated change.
+        Changes that leave every field equal produce no events.
+
+        Raises:
+            ValidationError: unknown fields or values violating the kind schema.
+        """
+        self._require_editable()
+        if not changes:
+            return ()
+        current = dataclasses.asdict(self.attributes)
+        unknown = sorted(set(changes) - set(current))
+        if unknown:
+            raise ValidationError(f"unknown {self.kind.value} attribute(s): {', '.join(unknown)}")
+        merged = current | dict(changes)
+        kinds.parse(self.kind, merged, schema_version=kinds.current_version(self.kind))
+        effective = {key: value for key, value in changes.items() if current[key] != value}
+        if not effective:
+            return ()
+        return (
+            ev.MemoryAttributesUpdated(
+                changes=effective,
+                attributes_schema_version=kinds.current_version(self.kind),
+            ),
+        )
 
     def decide_confirm(self, note: str | None = None) -> Sequence[object]:
         """Produce ``MemoryConfirmed`` (M4)."""
@@ -329,12 +387,29 @@ class Memory:
     def decide_set_visibility(
         self, visibility: Visibility, allowed_actors: Sequence[str] = ()
     ) -> Sequence[object]:
-        """Produce ``MemoryVisibilityChanged`` (M4)."""
-        raise NotImplementedError
+        """Produce ``MemoryVisibilityChanged``; no-op when nothing changes.
+
+        Raises:
+            ValidationError: allowed_actors given for a non-restricted visibility.
+        """
+        self._require_live()
+        actors = tuple(allowed_actors)
+        if actors and visibility is not Visibility.RESTRICTED:
+            raise ValidationError("allowed_actors applies only to restricted visibility")
+        if visibility is self.visibility and actors == self.allowed_actors:
+            return ()
+        return (ev.MemoryVisibilityChanged(visibility=visibility.value, allowed_actors=actors),)
 
     def decide_set_lifetime(self, lifetime: Lifetime) -> Sequence[object]:
-        """Produce ``MemoryLifetimeChanged`` (M4)."""
-        raise NotImplementedError
+        """Produce ``MemoryLifetimeChanged``; no-op when nothing changes."""
+        self._require_live()
+        if lifetime == self.lifetime:
+            return ()
+        return (
+            ev.MemoryLifetimeChanged(
+                lifetime_policy=lifetime.policy.value, lifetime_until=lifetime.until
+            ),
+        )
 
     def decide_link(self, link: Link) -> Sequence[object]:
         """Produce ``MemoryLinked`` (tier-1 edge, closed vocabulary — ADR-0010).

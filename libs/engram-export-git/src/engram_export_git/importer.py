@@ -25,9 +25,11 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
+from engram_core.application.commands import drafts as d
 from engram_core.application.commands.proposal_commands import ProposalCommandService
 from engram_core.domain.errors import ConflictError, ValidationError
 from engram_core.domain.kinds import KindRegistry
+from engram_core.domain.memory import Memory
 from engram_core.domain.values import (
     EvidenceType,
     LinkRelation,
@@ -39,6 +41,7 @@ from engram_core.domain.values import (
     validate_confidence,
 )
 from engram_events import EventEnvelope, EventRegistry, EventStore, Provenance, new_uuid7
+from engram_events.serde import encode_json_value
 from engram_export_git import layout, ndjson
 from engram_export_git.exporter import iter_ndjson_lines
 from engram_export_git.frontmatter import ParsedDocument, parse_document
@@ -55,10 +58,18 @@ class RestoreReport:
 
 @dataclass(frozen=True, slots=True)
 class ImportReport:
-    proposal_id: ProposalId
+    """What one import run proposed. ``memories`` = created + edited.
+
+    ``proposal_id`` is None when every document matched current state exactly —
+    nothing to review, nothing opened."""
+
+    proposal_id: ProposalId | None
     memories: int
     links: int
     evidence: int
+    created: int = 0
+    edited: int = 0
+    unchanged: int = 0
 
 
 class ImportEngine:
@@ -168,46 +179,86 @@ class ImportEngine:
     def import_documents(
         self, source: Path, provenance: Provenance, *, title: str | None = None
     ) -> ImportReport:
-        """Validate memory documents and open ONE proposal carrying the drafts.
+        """Validate memory documents and open ONE proposal carrying draft intents.
+
+        Documents whose ``id`` already exists in the store are **reconciled**
+        (ADR-0018 §4): the current aggregate is folded from its stream, the
+        semantic difference is computed, and edit intents are proposed — never a
+        duplicate ``MemoryCreated``. Unchanged documents contribute nothing; a
+        fully-unchanged import opens no proposal.
 
         ``source`` may be an export repository root, a directory of markdown, a
         single ``.md`` file, or a ``.ndjson`` file of memory records.
 
         Raises:
-            ValidationError: any invalid document (all problems reported at once);
-                nothing is opened on failure.
+            ValidationError: any invalid document, or a document addressing a
+                tombstoned memory (all problems reported at once); nothing is
+                opened on failure.
         """
         candidates, errors = self._collect_candidates(source)
-        if errors:
-            raise ValidationError("import rejected:\n" + "\n".join(errors))
-        if not candidates:
+        if not errors and not candidates:
             raise ValidationError(f"nothing importable found at {source}")
 
-        known_ids = {candidate["id"] for candidate in candidates}
-        drafts: list[dict[str, object]] = []
-        links = 0
-        evidence = 0
+        intents: list[d.DraftIntent] = []
+        created = edited = unchanged = links = evidence = 0
         for candidate in candidates:
-            drafts.append(_draft("MemoryCreated", candidate["id"], candidate["created"]))
-            for link_payload in candidate["links"]:
-                if link_payload["target_id"] not in known_ids:
-                    # Cross-space links to unknown targets were validated earlier.
-                    continue
-                drafts.append(_draft("MemoryLinked", candidate["id"], link_payload))
-                links += 1
-            for evidence_payload in candidate["evidence"]:
-                drafts.append(_draft("MemoryEvidenceAdded", candidate["id"], evidence_payload))
-                evidence += 1
+            current, problem = self._load_existing(candidate)
+            if problem is not None:
+                errors.append(problem)
+                continue
+            if current is None:
+                batch = _create_intents(candidate)
+                created += 1
+            else:
+                batch = _reconcile_intents(candidate, current)
+                if batch:
+                    edited += 1
+                else:
+                    unchanged += 1
+            links += sum(isinstance(i, d.LinkDraft | d.UnlinkDraft) for i in batch)
+            evidence += sum(isinstance(i, d.AddEvidenceDraft) for i in batch)
+            intents.extend(batch)
+        if errors:
+            raise ValidationError("import rejected:\n" + "\n".join(errors))
 
+        if not intents:
+            return ImportReport(
+                proposal_id=None, memories=0, links=0, evidence=0, unchanged=unchanged
+            )
         proposal_id = self._proposals.open_proposal(
             title or f"import: {source.name}",
-            f"imported from {source} ({len(candidates)} memories)",
-            drafts,
+            f"imported from {source} ({created} new, {edited} edited, {unchanged} unchanged)",
+            [d.to_dict(intent) for intent in intents],
             provenance,
         )
         return ImportReport(
-            proposal_id=proposal_id, memories=len(candidates), links=links, evidence=evidence
+            proposal_id=proposal_id,
+            memories=created + edited,
+            links=links,
+            evidence=evidence,
+            created=created,
+            edited=edited,
+            unchanged=unchanged,
         )
+
+    def _load_existing(self, candidate: dict[str, Any]) -> tuple[Memory | None, str | None]:
+        """The current aggregate for this candidate's id, if the stream exists."""
+        envelopes = self._store.read_stream(UUID(candidate["id"]))
+        if not envelopes:
+            return None, None
+        memory = Memory.fold(list(envelopes), self._kinds)
+        if memory.deleted:
+            return None, (
+                f"{candidate['name']}: memory {candidate['id']} was deleted;"
+                " re-importing it would resurrect history — use a new id instead"
+            )
+        if memory.kind.value != candidate["created"]["kind"]:
+            return None, (
+                f"{candidate['name']}: kind mismatch for {candidate['id']}"
+                f" (file says {candidate['created']['kind']},"
+                f" the memory is {memory.kind.value}; kind is immutable)"
+            )
+        return memory, None
 
     # -- candidate collection -----------------------------------------------------
 
@@ -370,8 +421,8 @@ class ImportEngine:
             target = _validated_uuid(entry.get("target") or entry.get("target_id"), fail)
             if target is None:
                 continue
-            if str(target) not in all_ids:
-                fail(f"link target {target} is not part of this import")
+            if str(target) not in all_ids and not self._store.read_stream(target):
+                fail(f"link target {target} is neither in this import nor in the store")
                 continue
             links.append({"target_id": str(target), "relation": relation})
 
@@ -406,8 +457,18 @@ class ImportEngine:
         candidates.append(
             {
                 "id": str(memory_id),
+                "name": name,
                 "links": links,
                 "evidence": evidence_payloads,
+                # Absent keys must not be diffed against existing memories: a
+                # hand-written partial document is not a request to remove things.
+                "specified": {
+                    "slug": slug is not None,
+                    "tags": "tags" in raw,
+                    "links": "links" in raw,
+                    "visibility": "visibility" in raw,
+                    "lifetime": "lifetime" in raw,
+                },
                 "created": {
                     "memory_id": str(memory_id),
                     "kind": kind.value,
@@ -474,15 +535,159 @@ def _parse_timestamp(value: object) -> datetime | None:
         return None
 
 
-def _draft(event_type: str, stream_id: str, payload: dict[str, object]) -> dict[str, object]:
-    """One serialized draft event, the shape ``ProposalOpened`` carries."""
-    return {
-        "draft_id": str(new_uuid7()),
-        "stream_id": stream_id,
-        "event_type": event_type,
-        "schema_version": 1,
-        "payload": dict(payload),
+def _create_intents(candidate: dict[str, Any]) -> list[d.DraftIntent]:
+    """A brand-new memory: one create + its links + its evidence."""
+    created = candidate["created"]
+    memory_id = UUID(candidate["id"])
+    intents: list[d.DraftIntent] = [
+        d.CreateMemoryDraft(
+            memory_id=memory_id,
+            kind=created["kind"],
+            slug=created["slug"],
+            title=created["title"],
+            content=created["content"],
+            attributes=dict(created["attributes"]),
+            attributes_schema_version=created["attributes_schema_version"],
+            tags=tuple(created["tags"]),
+            confidence=created["confidence"],
+            lifetime_policy=created["lifetime_policy"],
+            lifetime_until=created["lifetime_until"],
+            visibility=created["visibility"],
+            base_version=0,
+        )
+    ]
+    for link in candidate["links"]:
+        intents.append(
+            d.LinkDraft(
+                source_id=memory_id,
+                target_id=UUID(str(link["target_id"])),
+                relation=str(link["relation"]),
+                base_version=None,  # same-proposal follow-up on a stream created above
+            )
+        )
+    for entry in candidate["evidence"]:
+        intents.append(
+            d.AddEvidenceDraft(
+                memory_id=memory_id,
+                base_version=None,
+                evidence_type=str(entry["evidence_type"]),
+                value=str(entry["value"]),
+                note=entry["note"],
+            )
+        )
+    return intents
+
+
+def _reconcile_intents(candidate: dict[str, Any], memory: Memory) -> list[d.DraftIntent]:
+    """The semantic difference between a document and the current aggregate,
+    expressed as edit intents (ADR-0018 §4). Empty when nothing differs."""
+    created = candidate["created"]
+    specified = candidate["specified"]
+    memory_id = UUID(candidate["id"])
+    base = memory.version
+    intents: list[d.DraftIntent] = []
+
+    new_title = created["title"] if created["title"] != memory.title else None
+    new_content = (
+        created["content"] if created["content"].rstrip() != memory.content.rstrip() else None
+    )
+    new_slug = (
+        created["slug"] if specified["slug"] and created["slug"] != str(memory.slug) else None
+    )
+    if new_title is not None or new_content is not None or new_slug is not None:
+        intents.append(
+            d.EditMemoryDraft(
+                memory_id=memory_id,
+                base_version=base,
+                title=new_title,
+                content=new_content,
+                slug=new_slug,
+            )
+        )
+
+    if specified["tags"]:
+        file_tags = set(created["tags"])
+        current_tags = set(memory.tags)
+        add = tuple(sorted(file_tags - current_tags))
+        remove = tuple(sorted(current_tags - file_tags))
+        if add or remove:
+            intents.append(
+                d.TagMemoryDraft(memory_id=memory_id, base_version=base, add=add, remove=remove)
+            )
+
+    current_attributes = dataclasses.asdict(memory.attributes)
+    changes = {
+        key: value
+        for key, value in created["attributes"].items()
+        if key in current_attributes
+        and encode_json_value(current_attributes[key]) != encode_json_value(value)
     }
+    if changes:
+        intents.append(
+            d.UpdateAttributesDraft(memory_id=memory_id, base_version=base, changes=changes)
+        )
+
+    if specified["links"]:
+        file_links = {
+            (str(link["relation"]), str(link["target_id"])) for link in candidate["links"]
+        }
+        current_links = {(link.relation.value, str(link.target_id)) for link in memory.links}
+        for relation, target in sorted(file_links - current_links):
+            intents.append(
+                d.LinkDraft(
+                    source_id=memory_id,
+                    target_id=UUID(target),
+                    relation=relation,
+                    base_version=base,
+                )
+            )
+        for relation, target in sorted(current_links - file_links):
+            intents.append(
+                d.UnlinkDraft(
+                    source_id=memory_id,
+                    target_id=UUID(target),
+                    relation=relation,
+                    base_version=base,
+                )
+            )
+
+    current_evidence = {(ref.evidence_type.value, ref.value, ref.note) for ref in memory.evidence}
+    for entry in candidate["evidence"]:
+        key = (str(entry["evidence_type"]), str(entry["value"]), entry["note"])
+        if key not in current_evidence:
+            intents.append(
+                d.AddEvidenceDraft(
+                    memory_id=memory_id,
+                    base_version=base,
+                    evidence_type=str(entry["evidence_type"]),
+                    value=str(entry["value"]),
+                    note=entry["note"],
+                )
+            )
+    # Evidence *removals* in the file are deliberately ignored: retraction is a
+    # reviewed action (undo), not a file edit (ADR-0018 §4).
+
+    if specified["visibility"] and created["visibility"] != memory.visibility.value:
+        intents.append(
+            d.SetVisibilityDraft(
+                memory_id=memory_id, base_version=base, visibility=created["visibility"]
+            )
+        )
+    if specified["lifetime"] and (
+        created["lifetime_policy"] != memory.lifetime.policy.value
+        or created["lifetime_until"] != encode_json_value(memory.lifetime.until)
+    ):
+        intents.append(
+            d.SetLifetimeDraft(
+                memory_id=memory_id,
+                base_version=base,
+                lifetime_policy=created["lifetime_policy"],
+                lifetime_until=created["lifetime_until"],
+            )
+        )
+    # Confidence changes are deliberately not diffed: confidence moves through
+    # confirmation/contradiction (the scoring spine), not file edits.
+    return intents
 
 
 def _without_global_seq(envelope: EventEnvelope) -> EventEnvelope:

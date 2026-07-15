@@ -15,9 +15,10 @@ import dataclasses
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
+from uuid import UUID
 
 from engram_core.domain import events as ev
-from engram_core.domain.errors import ValidationError
+from engram_core.domain.errors import ConflictError, ValidationError
 from engram_core.domain.values import ProposalId
 from engram_events import EventEnvelope
 
@@ -28,6 +29,7 @@ class ProposalStatus(StrEnum):
     APPROVED = "approved"
     REJECTED = "rejected"
     MERGED = "merged"
+    UNDONE = "undone"
 
 
 @dataclass
@@ -40,6 +42,7 @@ class Proposal:
     status: ProposalStatus
     proposed_events: tuple[dict[str, object], ...] = ()
     review_note: str | None = None
+    merged_event_ids: tuple[UUID, ...] = ()
     version: int = 0
 
     @classmethod
@@ -78,7 +81,12 @@ class Proposal:
             case ev.ProposalRejected():
                 changes = {"status": ProposalStatus.REJECTED, "review_note": payload.note}
             case ev.ProposalMerged():
-                changes = {"status": ProposalStatus.MERGED}
+                changes = {
+                    "status": ProposalStatus.MERGED,
+                    "merged_event_ids": tuple(payload.appended_event_ids),
+                }
+            case ev.ProposalUndone():
+                changes = {"status": ProposalStatus.UNDONE}
             case _:
                 raise ValidationError(
                     f"event type not foldable on proposals: {envelope.event_type}"
@@ -117,16 +125,45 @@ class Proposal:
         Raises:
             ConflictError: unless status is ``pending`` or ``draft``.
         """
-        raise NotImplementedError
+        self._require_reviewable("approve")
+        return (ev.ProposalApproved(note=note),)
 
     def decide_reject(self, note: str | None = None) -> Sequence[object]:
-        """Produce ``ProposalRejected``."""
-        raise NotImplementedError
+        """Produce ``ProposalRejected``.
 
-    def decide_merge(self) -> Sequence[object]:
-        """Produce ``ProposalMerged``.
+        Raises:
+            ConflictError: unless status is ``pending`` or ``draft``.
+        """
+        self._require_reviewable("reject")
+        return (ev.ProposalRejected(note=note),)
+
+    def decide_merge(self, appended_event_ids: Sequence[UUID]) -> Sequence[object]:
+        """Produce ``ProposalMerged``. The application service supplies the ids of
+        the aggregate-decided events it is appending in the same atomic batch.
 
         Raises:
             ConflictError: unless status is ``approved``.
         """
-        raise NotImplementedError
+        if self.status is not ProposalStatus.APPROVED:
+            raise ConflictError(
+                f"proposal {self.id} is {self.status.value}; only approved proposals merge"
+            )
+        return (ev.ProposalMerged(appended_event_ids=tuple(appended_event_ids)),)
+
+    def decide_undo(
+        self, compensating_event_ids: Sequence[UUID], note: str | None = None
+    ) -> Sequence[object]:
+        """Produce ``ProposalUndone`` (ADR-0018: compensation, never erasure).
+
+        Raises:
+            ConflictError: unless status is ``merged``.
+        """
+        if self.status is not ProposalStatus.MERGED:
+            raise ConflictError(
+                f"proposal {self.id} is {self.status.value}; only merged proposals undo"
+            )
+        return (ev.ProposalUndone(note=note, compensating_event_ids=tuple(compensating_event_ids)),)
+
+    def _require_reviewable(self, action: str) -> None:
+        if self.status not in (ProposalStatus.DRAFT, ProposalStatus.PENDING):
+            raise ConflictError(f"cannot {action} proposal {self.id}: already {self.status.value}")

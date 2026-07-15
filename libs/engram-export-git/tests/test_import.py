@@ -76,14 +76,10 @@ class TestProposalImport:
         opened = after[-1].payload
         assert isinstance(opened, ProposalOpened)
         assert len(opened.proposed_events) == 4  # 2 created + 1 link + 1 evidence
-        types = sorted(str(d["event_type"]) for d in opened.proposed_events)
-        assert types == [
-            "MemoryCreated",
-            "MemoryCreated",
-            "MemoryEvidenceAdded",
-            "MemoryLinked",
-        ]
-        # Nothing appears in projected state until a human merges (M4).
+        ops = sorted(str(d["op"]) for d in opened.proposed_events)
+        assert ops == ["add_evidence", "create_memory", "create_memory", "link_memories"]
+        assert all(d["draft_schema_version"] == 2 for d in opened.proposed_events)
+        # Nothing appears in projected state until a human merges.
         assert space.query.list_memories(include_archived=True).items == ()
 
     def test_hand_written_file_without_id_gets_identity_minted(
@@ -137,7 +133,7 @@ class TestProposalImport:
     def test_link_to_unknown_target_is_rejected(self, space: Space, tmp_path: Path) -> None:
         doc = tmp_path / "dangling.md"
         doc.write_text(VALID_DOC, encoding="utf-8")  # companion is absent this time
-        with pytest.raises(ValidationError, match="not part of this import"):
+        with pytest.raises(ValidationError, match="neither in this import nor in the store"):
             space.importer.import_documents(doc, USER)
 
     def test_evidence_vocabulary_is_enforced(self, space: Space, tmp_path: Path) -> None:

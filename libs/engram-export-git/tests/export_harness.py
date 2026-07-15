@@ -28,6 +28,7 @@ from engram_export_git.importer import ImportEngine
 from engram_storage_sqlite.event_store import SqliteEventStore, create_sqlite_engine
 from engram_storage_sqlite.maintenance import rebuild_projections
 from engram_storage_sqlite.migrate import upgrade_to_head
+from engram_storage_sqlite.projections.proposals import ProposalProjection
 from engram_storage_sqlite.projections.search import SearchProjection
 from engram_storage_sqlite.projections.state import StateProjection
 from engram_storage_sqlite.query_engine import SqliteQueryEngine
@@ -53,9 +54,10 @@ class Space:
     importer: ImportEngine
     state: StateProjection
     search: SearchProjection
+    proposal_rows: ProposalProjection
 
     def rebuild(self) -> int:
-        return rebuild_projections(self.store, [self.state, self.search])
+        return rebuild_projections(self.store, [self.state, self.search, self.proposal_rows])
 
 
 def build_space(db_path: Path) -> Space:
@@ -66,8 +68,9 @@ def build_space(db_path: Path) -> Space:
     store = SqliteEventStore(engine, registry)
     state = StateProjection(engine)
     search = SearchProjection(engine)
+    proposal_rows = ProposalProjection(engine)
     bus = InProcessEventBus()
-    projections = (state, search)
+    projections = (state, search, proposal_rows)
 
     def _project(envelope: EventEnvelope) -> None:
         for projection in projections:
@@ -79,7 +82,7 @@ def build_space(db_path: Path) -> Space:
     proposal_repository = SqliteProposalRepository(store)
     clock = SystemClock()
     query = SqliteQueryEngine(engine)
-    proposals = ProposalCommandService(proposal_repository, repository, bus, clock)
+    proposals = ProposalCommandService(proposal_repository, repository, bus, clock, kinds, store)
     return Space(
         engine=engine,
         store=store,
@@ -90,6 +93,7 @@ def build_space(db_path: Path) -> Space:
         importer=ImportEngine(store, registry, kinds, proposals),
         state=state,
         search=search,
+        proposal_rows=proposal_rows,
     )
 
 

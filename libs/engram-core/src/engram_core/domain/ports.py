@@ -14,6 +14,7 @@ from engram_core.application.dto import (
     MemoryQuerySpec,
     MemoryReadModel,
     Page,
+    ProposalListItem,
     QueryHit,
     TimelineEntry,
 )
@@ -93,6 +94,14 @@ class MemoryQuery(Protocol):
     def timeline(self, memory_id: MemoryId) -> Sequence[TimelineEntry]:
         """The memory's full event history, oldest first."""
         ...
+
+
+class ProposalQuery(Protocol):
+    """Query access to the proposals projection (the review queue)."""
+
+    def list_proposals(
+        self, *, status: str | None = None, limit: int = 50
+    ) -> Page[ProposalListItem]: ...
 
 
 class QueryEngine(Protocol):

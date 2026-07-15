@@ -38,6 +38,7 @@ Justification spine (memory-model.md §3, §5):
 | `MemoryConfirmed` | Someone vouched for it | note; raises confidence, resets staleness |
 | `MemoryContradicted` | Someone disputed it | contradicting_id, note; lowers confidence |
 | `MemoryEvidenceAdded` | Support attached | evidence_type, value, note (append-only) |
+| `MemoryEvidenceRetracted` | Undo compensated an evidence addition (ADR-0018) | seq (1-based add order), reason — the log keeps both the evidence and its retraction |
 | `MemoryImportanceAdjusted` | Pin/unpin, explicit weight | pinned?, user_weight? |
 | `MemoryVisibilityChanged` | Recall audience changes | visibility, allowed_actors |
 | `MemoryLifetimeChanged` | Retention policy changes | policy, until |
@@ -55,8 +56,10 @@ Organization & lifecycle:
 
 ## Proposal events
 
-`ProposalOpened` (with serialized draft envelopes), `ProposalApproved`,
-`ProposalRejected`, `ProposalMerged` (with the appended event ids).
+`ProposalOpened` (carrying **draft intents**, not events — ADR-0018),
+`ProposalApproved`, `ProposalRejected`, `ProposalMerged` (with the ids of the
+aggregate-decided events appended in the same atomic batch), and `ProposalUndone`
+(with the ids of the compensating events; ADR-0018 §3 — history is never rewritten).
 
 ### Forward compatibility (accepted extension)
 

@@ -19,6 +19,7 @@ EXPECTED_TABLES = {
     "projection_checkpoints",
     "index_meta",
     "memory_fts",  # M2; its five memory_fts_* shadow tables are FTS5 internals
+    "proposals",  # M4: the review-queue projection
 }
 
 

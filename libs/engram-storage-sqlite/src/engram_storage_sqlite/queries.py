@@ -19,11 +19,12 @@ from engram_core.application.dto import (
     LinkView,
     MemoryReadModel,
     Page,
+    ProposalListItem,
     TimelineEntry,
 )
 from engram_core.domain import scoring
 from engram_core.domain.errors import NotFoundError, StorageError
-from engram_core.domain.values import MemoryId, MemoryKind
+from engram_core.domain.values import MemoryId, MemoryKind, ProposalId
 from engram_storage_sqlite.codec import decode_provenance, from_naive_utc
 from engram_storage_sqlite.models import (
     EventRecord,
@@ -31,6 +32,7 @@ from engram_storage_sqlite.models import (
     LinkRecord,
     MemoryRecord,
     MemoryTagRecord,
+    ProposalRecord,
 )
 
 _SECONDS_PER_DAY = 86_400.0
@@ -115,6 +117,35 @@ class SqliteMemoryQuery:
         )
 
     # -- helpers ------------------------------------------------------------------
+
+    def list_proposals(
+        self, *, status: str | None = None, limit: int = 50
+    ) -> Page[ProposalListItem]:
+        """The review queue, newest first (implements the ``ProposalQuery`` port)."""
+        statement = (
+            select(ProposalRecord)
+            .order_by(col(ProposalRecord.created_at).desc(), col(ProposalRecord.id).desc())
+            .limit(limit + 1)
+        )
+        if status is not None:
+            statement = statement.where(ProposalRecord.status == status)
+        with self._session() as session:
+            records = session.exec(statement).all()
+        items = tuple(
+            ProposalListItem(
+                id=ProposalId(UUID(record.id)),
+                title=record.title,
+                status=record.status,
+                draft_count=record.draft_count,
+                opened_by=record.opened_by,
+                review_note=record.review_note,
+                created_at=from_naive_utc(record.created_at),
+                updated_at=from_naive_utc(record.updated_at),
+            )
+            for record in records[:limit]
+        )
+        next_cursor = str(records[limit - 1].id) if len(records) > limit else None
+        return Page(items=items, next_cursor=next_cursor)
 
     def _session(self) -> Session:
         try:

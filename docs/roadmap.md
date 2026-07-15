@@ -53,14 +53,22 @@ state), plus links + evidence command paths (portability demanded they exist in 
 log). **Invariant green**: export → delete database → restore → rebuild reproduces
 identical events and identical state, and re-exports to an identical merkle root.
 
-## M4 — Proposal Workflow
+## M4 — Proposal Workflow ✅
 
-Proposals end-to-end (approve/reject/merge with conflict detection — open landed in M3
-as the importer's front door), the remaining spine commands (confirm/contradict/
-importance/visibility/lifetime), merge tooling, undo, and the markdown reconciler
-(targeted `MemoryEditedExternally` drafts instead of whole-memory imports).
-Invariant: no proposal merge ever silently overwrites; automation opens proposals,
-never events.
+Every mutation flows through a trustworthy review pipeline (ADR-0018). Drafts are
+**intents**, not events; merge re-drives them through the aggregate against current
+state and is the only event producer — one atomic batch per merge. Conflict
+detection compares stream history (`base_version` vs head), never projections.
+Undo compensates (inverse events in reverse order + `ProposalUndone`) and refuses
+if anything moved since the merge. The **reconciler**: importing a document whose
+id exists folds the current aggregate, computes the semantic diff, and proposes
+edit intents — never a duplicate `MemoryCreated`; unchanged imports open nothing.
+Plus: proposals projection + `engram proposals list/show/approve/reject/merge/undo`,
+attribute/visibility/lifetime commands, `MemoryEvidenceRetracted`.
+**Invariant green**: no merge without approval, no approval bypass, atomic merges,
+and replay determinism holds across the full import→merge→undo lifecycle.
+Deferred within the spine: confirm/contradict/importance (they are scoring-policy
+judgments — they land with M5's scoring work).
 
 ## M5 — Intelligence Pipeline
 

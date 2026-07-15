@@ -18,9 +18,9 @@ import typer
 from engram_cli import __version__
 from engram_cli.config import CliSettings
 from engram_cli.runtime import Runtime, build_runtime
-from engram_core.application.dto import CreateMemoryInput, MemoryReadModel
+from engram_core.application.dto import CreateMemoryInput, MemoryReadModel, ProposalListItem
 from engram_core.domain.errors import EngramError, ValidationError
-from engram_core.domain.values import LinkRelation, MemoryId, MemoryKind
+from engram_core.domain.values import LinkRelation, MemoryId, MemoryKind, ProposalId
 from engram_events import Provenance
 from engram_export_git.repo import GitVersionControl
 from engram_storage_sqlite.migrate import upgrade_to_head
@@ -360,12 +360,20 @@ def import_(
             )
             return
         result = runtime.importer.import_documents(source, _provenance(), title=title)
+        if result.proposal_id is None:
+            typer.echo(f"nothing to propose — {result.unchanged} document(s) match current state")
+            return
         typer.secho(
-            f"opened proposal {result.proposal_id}: {result.memories} memories,"
-            f" {result.links} links, {result.evidence} evidence entries",
+            f"opened proposal {result.proposal_id}: {result.created} new,"
+            f" {result.edited} edited, {result.unchanged} unchanged"
+            f" ({result.links} link changes, {result.evidence} evidence additions)",
             fg=typer.colors.GREEN,
         )
-        typer.echo("review and merge it when the proposal workflow lands (M4)")
+        typer.echo(
+            f"review it: engram proposals show {result.proposal_id}"
+            f" && engram proposals approve {result.proposal_id}"
+            f" && engram proposals merge {result.proposal_id}"
+        )
 
     _run(action)
 
@@ -390,6 +398,143 @@ def link(
             MemoryId(source_id), MemoryId(target_id), resolved, _provenance()
         )
         typer.secho(f"linked {source_id} -{relation}-> {target_id}", fg=typer.colors.GREEN)
+
+    _run(action)
+
+
+proposals_app = typer.Typer(
+    name="proposals",
+    help="The review queue: nothing changes memory without an approved merge (ADR-0018).",
+    no_args_is_help=True,
+)
+app.add_typer(proposals_app)
+
+
+def _proposal_line(item: ProposalListItem) -> str:
+    return (
+        f"{item.id}  {item.status:<9} {item.draft_count:>3} draft(s)"
+        f"  by {item.opened_by:<8} {item.created_at:%Y-%m-%d %H:%M}Z  {item.title}"
+    )
+
+
+@proposals_app.command(name="list")
+def proposals_list(
+    status: Annotated[
+        str | None, typer.Option(help="pending | approved | rejected | merged | undone")
+    ] = None,
+    limit: Annotated[int, typer.Option(min=1, max=200)] = 50,
+) -> None:
+    """The review queue, newest first."""
+
+    def action() -> None:
+        runtime = _runtime()
+        page = runtime.proposal_queries.list_proposals(status=status, limit=limit)
+        if not page.items:
+            typer.echo("no proposals" + (f" with status {status}" if status else ""))
+            return
+        for item in page.items:
+            typer.echo(_proposal_line(item))
+
+    _run(action)
+
+
+@proposals_app.command(name="show")
+def proposals_show(
+    proposal_id: Annotated[UUID, typer.Argument(help="The proposal's UUID")],
+) -> None:
+    """Inspect one proposal: status, review note, and every draft intent."""
+
+    def action() -> None:
+        runtime = _runtime()
+        detail = runtime.proposal_queries.get_proposal(ProposalId(proposal_id))
+        typer.echo(f"proposal: {detail.title}")
+        typer.echo(f"id: {detail.id}   status: {detail.status}   version: {detail.version}")
+        if detail.description:
+            typer.echo(f"description: {detail.description}")
+        if detail.review_note:
+            typer.echo(f"review note: {detail.review_note}")
+        typer.echo(f"drafts ({len(detail.drafts)}):")
+        for index, draft in enumerate(detail.drafts, start=1):
+            op = draft.get("op", draft.get("event_type", "?"))
+            target = draft.get("memory_id") or draft.get("source_id") or draft.get("stream_id")
+            base = draft.get("base_version")
+            summary = ", ".join(
+                f"{key}={value!r}"
+                for key, value in sorted(draft.items())
+                if key
+                not in ("op", "draft_schema_version", "memory_id", "source_id", "base_version")
+                and value not in (None, [], {}, "")
+            )
+            base_note = f" (base v{base})" if base is not None else ""
+            typer.echo(f"  #{index} {op} -> {target}{base_note}")
+            if summary:
+                typer.echo(f"      {summary}")
+        if detail.merged_event_ids:
+            typer.echo(f"merged events: {len(detail.merged_event_ids)}")
+
+    _run(action)
+
+
+@proposals_app.command(name="approve")
+def proposals_approve(
+    proposal_id: Annotated[UUID, typer.Argument()],
+    note: Annotated[str | None, typer.Option("--note", "-n")] = None,
+) -> None:
+    """Approve a pending proposal (merge is a separate, explicit step)."""
+
+    def action() -> None:
+        _runtime().proposals.approve_proposal(ProposalId(proposal_id), note, _provenance())
+        typer.secho(f"approved {proposal_id}", fg=typer.colors.GREEN)
+
+    _run(action)
+
+
+@proposals_app.command(name="reject")
+def proposals_reject(
+    proposal_id: Annotated[UUID, typer.Argument()],
+    note: Annotated[str | None, typer.Option("--note", "-n")] = None,
+) -> None:
+    """Reject a pending proposal; its drafts never become events."""
+
+    def action() -> None:
+        _runtime().proposals.reject_proposal(ProposalId(proposal_id), note, _provenance())
+        typer.secho(f"rejected {proposal_id}", fg=typer.colors.YELLOW)
+
+    _run(action)
+
+
+@proposals_app.command(name="merge")
+def proposals_merge(
+    proposal_id: Annotated[UUID, typer.Argument()],
+) -> None:
+    """Execute an approved proposal: every draft is re-validated by the aggregate
+    against current state; conflicts abort the whole merge."""
+
+    def action() -> None:
+        appended = _runtime().proposals.merge_proposal(ProposalId(proposal_id), _provenance())
+        typer.secho(
+            f"merged {proposal_id}: {len(appended)} event(s) appended", fg=typer.colors.GREEN
+        )
+
+    _run(action)
+
+
+@proposals_app.command(name="undo")
+def proposals_undo(
+    proposal_id: Annotated[UUID, typer.Argument()],
+    note: Annotated[str | None, typer.Option("--note", "-n")] = None,
+) -> None:
+    """Compensate a merged proposal: one inverse event per merged event, in reverse
+    order. Refused if anything changed since the merge. History is never rewritten."""
+
+    def action() -> None:
+        compensating = _runtime().proposals.undo_proposal(
+            ProposalId(proposal_id), note, _provenance()
+        )
+        typer.secho(
+            f"undone {proposal_id}: {len(compensating)} compensating event(s) appended",
+            fg=typer.colors.GREEN,
+        )
 
     _run(action)
 

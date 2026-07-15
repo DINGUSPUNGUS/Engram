@@ -10,6 +10,7 @@ from engram_core.application.commands.memory_commands import MemoryCommandServic
 from engram_core.application.commands.proposal_commands import ProposalCommandService
 from engram_core.application.queries.history_queries import HistoryQueryService
 from engram_core.application.queries.memory_queries import MemoryQueryService
+from engram_core.application.queries.proposal_queries import ProposalQueryService
 from engram_core.application.queries.search_queries import SearchQueryService
 from engram_core.application.queries.timeline_queries import TimelineQueryService
 from engram_core.domain.errors import NotFoundError
@@ -20,6 +21,7 @@ from engram_export_git.exporter import ExportEngine
 from engram_export_git.importer import ImportEngine
 from engram_storage_sqlite.event_store import SqliteEventStore, create_sqlite_engine
 from engram_storage_sqlite.maintenance import rebuild_projections
+from engram_storage_sqlite.projections.proposals import ProposalProjection
 from engram_storage_sqlite.projections.search import SearchProjection
 from engram_storage_sqlite.projections.state import StateProjection
 from engram_storage_sqlite.query_engine import SqliteQueryEngine
@@ -36,9 +38,11 @@ class Runtime:
     store: SqliteEventStore
     state_projection: StateProjection
     search_projection: SearchProjection
+    proposals_projection: ProposalProjection
     commands: MemoryCommandService
     proposals: ProposalCommandService
     queries: MemoryQueryService
+    proposal_queries: ProposalQueryService
     search: SearchQueryService
     timeline: TimelineQueryService
     history: HistoryQueryService
@@ -51,8 +55,10 @@ class Runtime:
     def status(self) -> SpaceStatus:
         return space_status(self.engine, self._projections())
 
-    def _projections(self) -> tuple[StateProjection | SearchProjection, ...]:
-        return (self.state_projection, self.search_projection)
+    def _projections(
+        self,
+    ) -> tuple[StateProjection | SearchProjection | ProposalProjection, ...]:
+        return (self.state_projection, self.search_projection, self.proposals_projection)
 
 
 def build_runtime(settings: CliSettings) -> Runtime:
@@ -65,9 +71,10 @@ def build_runtime(settings: CliSettings) -> Runtime:
     store = SqliteEventStore(engine, registry)
     state = StateProjection(engine)
     search = SearchProjection(engine)
+    proposals_projection = ProposalProjection(engine)
 
     bus = InProcessEventBus()
-    projections = (state, search)
+    projections = (state, search, proposals_projection)
 
     def _project(envelope: EventEnvelope) -> None:
         for projection in projections:
@@ -80,15 +87,17 @@ def build_runtime(settings: CliSettings) -> Runtime:
     proposal_repository = SqliteProposalRepository(store)
     query = SqliteQueryEngine(engine)
     clock = SystemClock()
-    proposals = ProposalCommandService(proposal_repository, repository, bus, clock)
+    proposals = ProposalCommandService(proposal_repository, repository, bus, clock, kinds, store)
     return Runtime(
         engine=engine,
         store=store,
         state_projection=state,
         search_projection=search,
+        proposals_projection=proposals_projection,
         commands=MemoryCommandService(repository, bus, clock, kinds),
         proposals=proposals,
         queries=MemoryQueryService(query),
+        proposal_queries=ProposalQueryService(proposal_repository, query),
         search=SearchQueryService(query, clock, kinds),
         timeline=TimelineQueryService(query),
         history=HistoryQueryService(repository),

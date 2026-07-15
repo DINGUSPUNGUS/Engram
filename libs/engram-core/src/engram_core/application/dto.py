@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
-from engram_core.domain.values import Lifetime, MemoryId, MemoryKind, Visibility
+from engram_core.domain.values import Lifetime, MemoryId, MemoryKind, ProposalId, Visibility
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,6 +148,34 @@ class TimelineEntry:
     occurred_at: datetime
     actor: str
     stream_seq: int
+
+
+@dataclass(frozen=True, slots=True)
+class ProposalListItem:
+    """One row of the review queue (from the proposals projection)."""
+
+    id: ProposalId
+    title: str
+    status: str
+    draft_count: int
+    opened_by: str
+    review_note: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class ProposalDetail:
+    """One proposal in full — folded from its event stream, drafts included."""
+
+    id: ProposalId
+    title: str
+    description: str
+    status: str
+    review_note: str | None
+    drafts: tuple[dict[str, object], ...]
+    merged_event_ids: tuple[UUID, ...]
+    version: int
 
 
 @dataclass(frozen=True, slots=True)

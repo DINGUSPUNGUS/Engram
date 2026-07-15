@@ -95,6 +95,16 @@ class MemoryEvidenceAdded:
 
 
 @dataclass(frozen=True, slots=True)
+class MemoryEvidenceRetracted:
+    """Evidence entry ``seq`` (1-based, in add order) no longer counts toward
+    current state. The log keeps both the evidence and this retraction —
+    append-only as history, reversible as state (ADR-0018). Emitted by undo."""
+
+    seq: int
+    reason: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class MemoryImportanceAdjusted:
     """Pin/unpin or set an explicit user weight. ``None`` means "unchanged"."""
 
@@ -197,9 +207,19 @@ class ProposalRejected:
 
 @dataclass(frozen=True, slots=True)
 class ProposalMerged:
-    """Approval was executed: the proposed events were appended to their streams."""
+    """Approval was executed: the aggregate-decided events were appended to their
+    target streams (ADR-0018: drafts are intents; merge is the event producer)."""
 
     appended_event_ids: tuple[UUID, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class ProposalUndone:
+    """The merge was compensated: one inverse event per merged event, appended in
+    reverse order (ADR-0018). History is never rewritten."""
+
+    note: str | None = None
+    compensating_event_ids: tuple[UUID, ...] = ()
 
 
 # ---------------------------------------------------------------------------
@@ -214,6 +234,7 @@ _EVENT_TYPES: dict[str, type] = {
     "MemoryConfirmed": MemoryConfirmed,
     "MemoryContradicted": MemoryContradicted,
     "MemoryEvidenceAdded": MemoryEvidenceAdded,
+    "MemoryEvidenceRetracted": MemoryEvidenceRetracted,
     "MemoryImportanceAdjusted": MemoryImportanceAdjusted,
     "MemoryVisibilityChanged": MemoryVisibilityChanged,
     "MemoryLifetimeChanged": MemoryLifetimeChanged,
@@ -229,6 +250,7 @@ _EVENT_TYPES: dict[str, type] = {
     "ProposalApproved": ProposalApproved,
     "ProposalRejected": ProposalRejected,
     "ProposalMerged": ProposalMerged,
+    "ProposalUndone": ProposalUndone,
 }
 
 

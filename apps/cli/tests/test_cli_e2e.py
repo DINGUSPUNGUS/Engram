@@ -219,3 +219,58 @@ def test_export_git_and_restore_round_trip(space: Path, tmp_path: Path) -> None:
     assert "opened proposal" in result.output
     result = runner.invoke(app, ["list"])
     assert "Imported note" not in result.output  # pending review, not memory
+
+
+@pytest.mark.integration
+def test_proposal_lifecycle_end_to_end(space: Path, tmp_path: Path) -> None:
+    """M4 through the binary surface: external edit → reconciled proposal →
+    inspect → approve → merge → undo → state restored, history intact."""
+    assert runner.invoke(app, ["init"]).exit_code == 0
+    result = runner.invoke(app, ["add", "fact", "User prefers dark mode", "-t", "ui"])
+    fact_id = _extract_id(result.output)
+    repo = space / "memory"
+    assert runner.invoke(app, ["export"]).exit_code == 0
+
+    # A human edits the exported file.
+    fact_file = next((repo / "memory" / "facts").glob("*.md"))
+    text = fact_file.read_text(encoding="utf-8").replace(
+        'title: "User prefers dark mode"', 'title: "User prefers OLED dark"'
+    )
+    fact_file.write_text(text, encoding="utf-8")
+
+    result = runner.invoke(app, ["import", str(repo / "memory")])
+    assert result.exit_code == 0, result.output
+    assert "1 edited" in result.output
+    proposal_id = re.search(r"proposal ([0-9a-f-]{36})", result.output).group(1)  # type: ignore[union-attr]
+
+    result = runner.invoke(app, ["proposals", "list"])
+    assert "pending" in result.output
+    result = runner.invoke(app, ["proposals", "show", proposal_id])
+    assert result.exit_code == 0, result.output
+    assert "edit_memory" in result.output
+    assert "create_memory" not in result.output  # reconciled, never duplicated
+
+    # Merge before approval is refused; the review pipeline is not optional.
+    result = runner.invoke(app, ["proposals", "merge", proposal_id])
+    assert result.exit_code == 1
+    assert "only approved" in result.output
+
+    assert runner.invoke(app, ["proposals", "approve", proposal_id, "-n", "lgtm"]).exit_code == 0
+    result = runner.invoke(app, ["proposals", "merge", proposal_id])
+    assert result.exit_code == 0, result.output
+    result = runner.invoke(app, ["show", fact_id])
+    assert "User prefers OLED dark" in result.output
+
+    # Undo compensates; the timeline keeps the whole story.
+    result = runner.invoke(app, ["proposals", "undo", proposal_id, "-n", "mistake"])
+    assert result.exit_code == 0, result.output
+    result = runner.invoke(app, ["show", fact_id])
+    assert "User prefers dark mode" in result.output
+    assert "MemoryEdited" in result.output  # both edits visible in the timeline
+
+    # Replay determinism across the whole lifecycle.
+    assert runner.invoke(app, ["rebuild"]).exit_code == 0
+    result = runner.invoke(app, ["show", fact_id])
+    assert "User prefers dark mode" in result.output
+    result = runner.invoke(app, ["proposals", "list", "--status", "undone"])
+    assert proposal_id in result.output

@@ -199,8 +199,15 @@ class MemoryCommandService:
     def update_attributes(
         self, memory_id: MemoryId, input: UpdateAttributesInput, provenance: Provenance
     ) -> None:
-        """Sparse change to kind-schema fields (M4)."""
-        raise NotImplementedError
+        """Sparse change to kind-schema fields, validated against the KindRegistry.
+
+        Raises:
+            StaleVersionError: ``input.expected_version`` is outdated.
+            ValidationError: unknown fields or schema violations.
+        """
+        memory = self._load_at(memory_id, input.expected_version)
+        payloads = memory.decide_update_attributes(dict(input.changes), self._kinds)
+        self._commit(memory_id, memory.version, payloads, provenance)
 
     def confirm_memory(self, memory_id: MemoryId, note: str | None, provenance: Provenance) -> None:
         """Vouch for a memory (M4)."""
@@ -241,12 +248,15 @@ class MemoryCommandService:
         allowed_actors: tuple[str, ...],
         provenance: Provenance,
     ) -> None:
-        """Change who may recall this memory (M4)."""
-        raise NotImplementedError
+        """Change who may recall this memory."""
+        memory = self._repository.load(memory_id)
+        payloads = memory.decide_set_visibility(visibility, allowed_actors)
+        self._commit(memory_id, memory.version, payloads, provenance)
 
     def set_lifetime(self, memory_id: MemoryId, lifetime: Lifetime, provenance: Provenance) -> None:
-        """Change the retention policy (M4)."""
-        raise NotImplementedError
+        """Change the retention policy."""
+        memory = self._repository.load(memory_id)
+        self._commit(memory_id, memory.version, memory.decide_set_lifetime(lifetime), provenance)
 
     def link_memories(
         self,

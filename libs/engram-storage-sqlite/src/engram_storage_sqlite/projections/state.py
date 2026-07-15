@@ -6,6 +6,8 @@ transaction — replaying the whole log always lands on the same rows
 (the M1 invariant, CI-tested).
 """
 
+import json
+
 from sqlalchemy import func
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -37,7 +39,10 @@ class StateProjection:
         return _NAME
 
     def handles(self, event_type: str) -> bool:
-        return event_type.startswith("Memory")
+        # Every projection observes every event: the checkpoint tracks the whole
+        # log, so unrelated streams (e.g. proposals) never read as drift.
+        # Irrelevant events no-op in _apply_event and only advance the checkpoint.
+        return True
 
     def apply(self, envelope: EventEnvelope) -> None:
         if envelope.global_seq is None:
@@ -171,15 +176,17 @@ class StateProjection:
                 record.version = envelope.stream_seq
                 session.add(record)
             case ev.MemoryEvidenceAdded():
-                count = session.exec(
-                    select(func.count())
-                    .select_from(EvidenceRecord)
-                    .where(col(EvidenceRecord.memory_id) == stream_id)
+                # max(seq)+1, not count+1: retraction leaves gaps that must never
+                # be reused (ADR-0018).
+                head = session.exec(
+                    select(func.max(EvidenceRecord.seq)).where(
+                        col(EvidenceRecord.memory_id) == stream_id
+                    )
                 ).one()
                 session.add(
                     EvidenceRecord(
                         memory_id=stream_id,
-                        seq=int(count) + 1,
+                        seq=(int(head) if head is not None else 0) + 1,
                         evidence_type=payload.evidence_type,
                         value=payload.value,
                         note=payload.note,
@@ -188,6 +195,37 @@ class StateProjection:
                     )
                 )
                 record = self._memory_row(session, stream_id)
+                record.version = envelope.stream_seq
+                session.add(record)
+            case ev.MemoryEvidenceRetracted():
+                evidence_row = session.get(EvidenceRecord, (stream_id, payload.seq))
+                if evidence_row is not None:
+                    session.delete(evidence_row)
+                record = self._memory_row(session, stream_id)
+                record.version = envelope.stream_seq
+                session.add(record)
+            case ev.MemoryAttributesUpdated():
+                record = self._memory_row(session, stream_id)
+                merged = dict(json.loads(record.attributes)) | dict(payload.changes)
+                record.attributes = encode_json(merged)
+                record.attributes_schema_version = payload.attributes_schema_version
+                record.updated_at = occurred
+                record.version = envelope.stream_seq
+                session.add(record)
+            case ev.MemoryVisibilityChanged():
+                record = self._memory_row(session, stream_id)
+                record.visibility = payload.visibility
+                record.allowed_actors = encode_json(list(payload.allowed_actors))
+                record.updated_at = occurred
+                record.version = envelope.stream_seq
+                session.add(record)
+            case ev.MemoryLifetimeChanged():
+                record = self._memory_row(session, stream_id)
+                record.lifetime_policy = payload.lifetime_policy
+                record.lifetime_until = (
+                    to_naive_utc(payload.lifetime_until) if payload.lifetime_until else None
+                )
+                record.updated_at = occurred
                 record.version = envelope.stream_seq
                 session.add(record)
             case ev.MemoryAccessed():
