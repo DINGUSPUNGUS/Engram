@@ -1,23 +1,19 @@
 # @engram/mcp
 
-MCP server for engram — **deliberately a stub** until milestone M6.
+MCP server for engram — **a stub awaiting its transport**. The behavior it will
+expose already exists: the assistant gateway (`libs/engram-assistants`, ADR-0020,
+[docs/integrations.md](../../docs/integrations.md)).
 
-## Why it's empty
+## Why it's still empty
 
-The MCP server must be a thin shell over the same application services the REST API and
-CLI use (ADR-0007). Building it before those services exist would force it to invent its
-own logic, which is exactly the duplication the architecture forbids.
+The MCP server is a thin stdio shell over the `AssistantGateway` (ADR-0007): the
+five canonical tools (`engram_search/recall/remember/proposal_status/timeline`),
+capability negotiation, the recall boundary, and structural consent (no review
+verbs — nothing an assistant submits becomes memory until the user merges the
+proposal) are all defined once in the gateway and fully tested there. This app
+adds only the MCP protocol framing.
 
-## Planned tool surface
-
-| MCP tool | Application service call |
-| --- | --- |
-| `engram_search` | `SearchQueryService.search` + `record_access` |
-| `engram_recall` | `MemoryQueryService.get_memory` + `record_access` |
-| `engram_remember` | `MemoryCommandService.create_memory` (or a Proposal when review is on) |
-| `engram_forget` | `MemoryCommandService.archive_memory` |
-| `engram_timeline` | `TimelineQueryService.memory_timeline` |
-
-Provenance: every tool call carries the assistant's identity into the event log's
-`provenance` field — that is how a shared memory stays auditable across ChatGPT, Claude,
-Gemini, Cursor, Copilot, and local models.
+Note the M4/M5 correction to the original plan: `engram_remember` never calls
+`create_memory` — it runs the intelligence pipeline and opens ONE Proposal; and
+`engram_forget` is deferred until an archive draft intent exists (an ADR-worthy
+proposal-workflow addition, not to be smuggled in through a tool).

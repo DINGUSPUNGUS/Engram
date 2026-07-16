@@ -4,8 +4,10 @@
 > space is portable (M3), every mutation flows through a **review pipeline** (M4), and
 > the **intelligence pipeline is live** (M5): `engram ingest` extracts typed, evidence-
 > cited memory candidates from conversations — locally, via Ollama — and its only power
-> is to open a proposal. AI proposes; events decide. The assistant integrations and
-> surfaces land milestone by milestone ([roadmap](docs/roadmap.md)).
+> is to open a proposal. AI proposes; events decide. **Assistants are connected** (M6):
+> ChatGPT, Claude, and Gemini share the substrate through one gateway whose tool surface
+> has no review verbs. The dashboard and MCP transport land milestone by milestone
+> ([roadmap](docs/roadmap.md)).
 
 **engram** is a local-first, user-owned memory engine for AI assistants. It lets ChatGPT,
 Claude, Gemini, Cursor, Copilot, Ollama, and anything else that speaks MCP or REST share a
@@ -62,6 +64,7 @@ tables      later)                   │
 | `libs/engram-storage-sqlite` | Canonical store: SQLModel event store + state projections + Alembic migrations. |
 | `libs/engram-export-git` | Markdown/NDJSON export projector, git committer, inbound reconciler. |
 | `libs/engram-intelligence` | AI layer: ingestion pipeline contracts, LLM provider port (SDKs confined to `providers/`), versioned prompts, eval harness. |
+| `libs/engram-assistants` | Assistant integration layer: the provider-agnostic gateway + ChatGPT/Claude/Gemini adapters (wire-format translation only, ADR-0020). |
 | `libs/engram-observatory` | Explainability: the audit graph answering "why did it do that?" (decision traces, not logs). |
 | `evaluations/` | Golden cases + synthetic corpus spec + the committed quality baseline. |
 | `apps/api` | FastAPI REST server (thin shell over application services). |
@@ -118,6 +121,7 @@ no accounts, no telemetry.
 - [The Memory Model](docs/memory-model.md) — twelve typed kinds + the justification spine
 - [The Export Format](docs/export-format.md) — the portable repository: markdown, NDJSON, manifest, restore vs import
 - [Intelligence](docs/intelligence.md) — ingestion pipeline, provider port, prompts, evals
+- [Assistant Integrations](docs/integrations.md) — the gateway, adapters, capabilities, the recall boundary
 - [Domain model](docs/domain-model.md) · [Events](docs/events.md) · [Data flow](docs/data-flow.md)
 - [REST API](docs/api.md) · [Conventions](docs/conventions.md) · [Operations](docs/operations.md)
 - [Security](docs/security.md) · [Roadmap](docs/roadmap.md) · [ADRs](docs/adr/)

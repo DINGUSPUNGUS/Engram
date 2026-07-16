@@ -96,11 +96,25 @@ ingest→merge→undo lifecycle; FTS-only installs remain first-class (Windows).
 **Remaining in scope, not yet landed**: semantic search (`EmbeddingProvider` +
 sqlite-vec behind `supports_vectors`) and the seeded synthetic-corpus generator.
 
-## M6 — Assistant Integrations
+## M6 — Assistant Integrations ✅ (core; MCP transport remains)
 
-MCP server (`engram_search/recall/remember/forget/timeline`), provenance per assistant,
-integration guides for Claude/Cursor/ChatGPT/Ollama. Invariant: MCP is a thin shell over
-the same services (ADR-0007).
+One provider-agnostic **AssistantGateway** (ADR-0020, [integrations.md](integrations.md))
+defines everything an assistant may do — `engram_search/recall/remember/
+proposal_status/timeline` — with capability negotiation, strict argument
+validation, and the recall boundary enforced (private/restricted/archived never
+reach assistants; hidden ≡ absent). ChatGPT, Claude, and Gemini adapters translate
+wire formats and contain no decisions; a shared contract suite proves identical
+canonical behavior across all three. **The tool surface has no review verbs** —
+consent is structural: submissions run the M5 pipeline and open ONE proposal;
+only human surfaces approve/merge. Every recall appends an attributed
+`MemoryAccessed`; every submission's `ProposalOpened` carries adapter + provider +
+model + session inside the pipeline explanation.
+**Invariant green**: adapters cannot bypass proposal creation; ungranted
+capabilities degrade to well-formed errors; replay determinism holds after
+complete assistant-driven workflows.
+Remaining in M6 scope: the MCP stdio transport (a thin shell over this gateway)
+and `engram_forget` (needs an archive intent — an ADR-worthy proposal-workflow
+addition, deliberately not smuggled in).
 
 ## M7 — Web Dashboard
 

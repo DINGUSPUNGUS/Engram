@@ -96,6 +96,7 @@ root_packages = [
     "engram_storage_sqlite",
     "engram_export_git",
     "engram_intelligence",
+    "engram_assistants",
     "engram_api",
     "engram_cli",
 ]
@@ -105,6 +106,7 @@ name = "Hexagonal layering (inward-only imports)"
 type = "layers"
 layers = [
     "engram_api | engram_cli",
+    "engram_assistants",  # integration layer: composes adapters for external assistants (ADR-0020)
     "engram_storage_sqlite | engram_export_git | engram_intelligence",
     "engram_observatory",
     "engram_core",
@@ -126,6 +128,7 @@ source_modules = [
     "engram_intelligence.evals",
     "engram_intelligence.evaluators",
     "engram_intelligence.provider",
+    "engram_assistants",
     "engram_api",
     "engram_cli",
 ]

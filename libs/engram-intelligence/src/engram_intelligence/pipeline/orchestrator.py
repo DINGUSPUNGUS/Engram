@@ -30,6 +30,16 @@ from engram_intelligence.pipeline.types import IngestionOutcome, Transcript
 _PIPELINE_VERSION = "ingestion/1"
 
 
+def _parse_detail(detail: str | None) -> object:
+    """Caller detail is often JSON (the gateway's is); keep it structured when so."""
+    if detail is None:
+        return None
+    try:
+        return json.loads(detail)
+    except json.JSONDecodeError:
+        return detail
+
+
 class IngestionPipeline:
     """Conversation in, Proposal out. Never writes a memory stream directly."""
 
@@ -96,6 +106,10 @@ class IngestionPipeline:
                 "actor": transcript.source.actor,
                 "session_id": transcript.source.session_id,
                 "transcript_id": transcript.transcript_id,
+                # Caller-supplied provenance detail (e.g. the assistant gateway's
+                # integration metadata, ADR-0020) survives into the run
+                # explanation — dropping it would break the trace chain.
+                "detail": _parse_detail(transcript.source.detail),
             },
             "prompts": sorted({call.prompt for call in self._trace.calls}),
             "counts": counts,

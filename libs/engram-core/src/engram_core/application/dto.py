@@ -60,6 +60,7 @@ class MemoryReadModel:
     lifetime_policy: str
     lifetime_until: datetime | None
     visibility: str
+    allowed_actors: tuple[str, ...]
     pinned: bool
     user_weight: float | None
     access_count: int

@@ -69,6 +69,7 @@ def fixture_read_model(case_id: str, index: int, spec: Mapping[str, object]) -> 
         lifetime_policy="standard",
         lifetime_until=None,
         visibility="shared",
+        allowed_actors=(),
         pinned=False,
         user_weight=None,
         access_count=0,

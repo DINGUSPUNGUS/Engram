@@ -211,6 +211,7 @@ class SqliteMemoryQuery:
                 from_naive_utc(record.lifetime_until) if record.lifetime_until else None
             ),
             visibility=record.visibility,
+            allowed_actors=tuple(json.loads(record.allowed_actors)),
             pinned=record.pinned,
             user_weight=record.user_weight,
             access_count=record.access_count,
