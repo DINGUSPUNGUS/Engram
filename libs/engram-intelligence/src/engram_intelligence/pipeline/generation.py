@@ -132,10 +132,20 @@ class LLMCandidateGenerator:
     def _match_evidence(
         self, item: dict[str, object], evidence: Sequence[ExtractedEvidence]
     ) -> tuple[ExtractedEvidence, ...]:
+        """Match cited quotes to stage-2 evidence. Wrapper quote marks the model
+        adds around its citation are stripped before lookup — lossless, because
+        what attaches is always the stage-2 verbatim ``ExtractedEvidence``,
+        never the model's citation string."""
         raw = item.get("evidence_quotes")
         quotes = [str(q).strip() for q in raw] if isinstance(raw, list) else []
         by_quote = {entry.quote: entry for entry in evidence}
-        return tuple(by_quote[quote] for quote in quotes if quote in by_quote)
+        wrappers = "'\"‘’“”"  # noqa: RUF001 — the smart quotes ARE the target
+        matched: list[ExtractedEvidence] = []
+        for quote in quotes:
+            entry = by_quote.get(quote) or by_quote.get(quote.strip(wrappers))
+            if entry is not None and entry not in matched:
+                matched.append(entry)
+        return tuple(matched)
 
     def _parse_links(
         self,

@@ -215,6 +215,33 @@ def test_generator_enforces_the_stage_law() -> None:
 
 
 @pytest.mark.unit
+def test_generator_matches_evidence_cited_with_wrapper_quotes() -> None:
+    """Small local models wrap their citation in literal quote marks; the lookup
+    strips wrappers but what attaches is always the stage-2 verbatim entry."""
+    trace = PipelineTrace()
+    chunks = TurnChunker().chunk(transcript())
+    evidence = LLMEvidenceExtractor(fake_provider(), PROMPTS, PipelineTrace()).extract(chunks)
+    wrapped = json.dumps(
+        [
+            {
+                "kind": "person",
+                "title": "Sarah Chen",
+                "content": "",
+                "attributes": {"full_name": "Sarah Chen"},
+                "evidence_quotes": [f"'{_QUOTE_1}'"],
+                "links": [],
+            }
+        ]
+    )
+    generator = LLMCandidateGenerator(
+        FakeProvider(responses={"candidate-generation": wrapped}), PROMPTS, KINDS, trace
+    )
+    candidates = generator.generate(chunks, evidence, ())
+    assert len(candidates) == 1
+    assert [e.quote for e in candidates[0].evidence] == [_QUOTE_1]
+
+
+@pytest.mark.unit
 def test_resolver_matches_aliases_and_never_guesses() -> None:
     sarah = fixture_read_model(
         "t", 0, {"kind": "person", "attributes": {"full_name": "Sarah Chen", "aliases": ["SC"]}}
