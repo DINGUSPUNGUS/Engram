@@ -69,9 +69,11 @@ class LLMEvidenceExtractor:
             except ValueError as exc:
                 self._trace.note(_STAGE, f"chunk {chunk.index}: unparseable response ({exc})")
                 continue
+            unquoted = 0
             for item in items:
                 quote = str(item.get("quote") or "").strip()
                 if not quote:
+                    unquoted += 1
                     continue
                 if quote in seen:
                     continue
@@ -88,5 +90,11 @@ class LLMEvidenceExtractor:
                         evidence_type=EvidenceType.QUOTE,
                         rationale=str(item["reason"]) if item.get("reason") else None,
                     )
+                )
+            if unquoted:
+                self._trace.note(
+                    _STAGE,
+                    f"chunk {chunk.index}: {unquoted} item(s) carried no 'quote' field"
+                    " — response shape ignored",
                 )
         return evidence
