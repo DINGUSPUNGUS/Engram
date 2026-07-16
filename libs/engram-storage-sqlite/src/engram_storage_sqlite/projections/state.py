@@ -14,6 +14,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlmodel import Session, col, delete, select
 
 from engram_core.domain import events as ev
+from engram_core.domain import scoring
 from engram_core.domain.errors import StorageError
 from engram_events import EventEnvelope
 from engram_storage_sqlite.codec import encode_json, to_naive_utc
@@ -228,8 +229,45 @@ class StateProjection:
                 record.updated_at = occurred
                 record.version = envelope.stream_seq
                 session.add(record)
+            case ev.MemoryConfirmed():
+                record = self._memory_row(session, stream_id)
+                record.confidence = scoring.confirm_confidence(record.confidence, payload.weight)
+                record.last_confirmed_at = occurred
+                record.updated_at = occurred
+                record.version = envelope.stream_seq
+                session.add(record)
+            case ev.MemoryContradicted():
+                record = self._memory_row(session, stream_id)
+                record.confidence = scoring.contradict_confidence(record.confidence, payload.weight)
+                record.updated_at = occurred
+                record.version = envelope.stream_seq
+                session.add(record)
+            case ev.MemoryConfidenceRestored():
+                record = self._memory_row(session, stream_id)
+                record.confidence = payload.confidence
+                record.last_confirmed_at = (
+                    to_naive_utc(payload.last_confirmed_at)
+                    if payload.last_confirmed_at is not None
+                    else None
+                )
+                record.updated_at = occurred
+                record.version = envelope.stream_seq
+                session.add(record)
+            case ev.MemoryImportanceAdjusted():
+                record = self._memory_row(session, stream_id)
+                if payload.pinned is not None:
+                    record.pinned = payload.pinned
+                if payload.clear_user_weight:
+                    record.user_weight = None
+                elif payload.user_weight is not None:
+                    record.user_weight = payload.user_weight
+                record.updated_at = occurred
+                record.version = envelope.stream_seq
+                session.add(record)
             case ev.MemoryAccessed():
                 record = self._memory_row(session, stream_id)
+                record.access_count += 1
+                record.last_accessed_at = occurred
                 record.version = envelope.stream_seq
                 session.add(record)
             case _:

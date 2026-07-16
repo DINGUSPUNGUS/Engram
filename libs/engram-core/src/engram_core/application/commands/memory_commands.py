@@ -210,8 +210,11 @@ class MemoryCommandService:
         self._commit(memory_id, memory.version, payloads, provenance)
 
     def confirm_memory(self, memory_id: MemoryId, note: str | None, provenance: Provenance) -> None:
-        """Vouch for a memory (M4)."""
-        raise NotImplementedError
+        """Vouch for a memory. The confirmer's weight is resolved from the
+        scoring policy and provenance, then recorded in the event (ADR-0019)."""
+        memory = self._repository.load(memory_id)
+        weight = scoring.confirm_weight_for(provenance.actor)
+        self._commit(memory_id, memory.version, memory.decide_confirm(weight, note), provenance)
 
     def contradict_memory(
         self,
@@ -220,8 +223,18 @@ class MemoryCommandService:
         note: str | None,
         provenance: Provenance,
     ) -> None:
-        """Dispute a memory (M4)."""
-        raise NotImplementedError
+        """Dispute a memory; when the disputing memory is named it must exist
+        and a ``contradicts`` edge is created alongside (memory-model.md §5).
+
+        Raises:
+            NotFoundError: unknown memory, or unknown contradicting memory.
+        """
+        memory = self._repository.load(memory_id)
+        if contradicting_id is not None:
+            self._repository.load(contradicting_id)  # existence check
+        weight = scoring.contradict_weight_for(provenance.actor)
+        payloads = memory.decide_contradict(weight, contradicting_id, note)
+        self._commit(memory_id, memory.version, payloads, provenance)
 
     def add_evidence(
         self, memory_id: MemoryId, evidence: EvidenceRef, provenance: Provenance
@@ -236,10 +249,15 @@ class MemoryCommandService:
         *,
         pinned: bool | None = None,
         user_weight: float | None = None,
+        clear_user_weight: bool = False,
         provenance: Provenance,
     ) -> None:
-        """Pin/unpin or set the explicit user weight (M4)."""
-        raise NotImplementedError
+        """Pin/unpin or set/clear the explicit user weight (importance signal)."""
+        memory = self._repository.load(memory_id)
+        payloads = memory.decide_adjust_importance(
+            pinned=pinned, user_weight=user_weight, clear_user_weight=clear_user_weight
+        )
+        self._commit(memory_id, memory.version, payloads, provenance)
 
     def set_visibility(
         self,

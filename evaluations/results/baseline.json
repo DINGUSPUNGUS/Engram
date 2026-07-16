@@ -4,8 +4,13 @@
     "generator_version": null,
     "provider": null,
     "model": null,
-    "measured_at": null
+    "measured_at": "2026-07-15",
+    "notes": "Deterministic stages only (chunking, alias resolution, conflict rules) — measured over the 3-case golden set by test_golden_gate.py, which enforces this baseline in CI. LLM-backed stages (evidence_extraction, candidate_generation) enter once measured against a pinned provider+model; until then their evaluators exist but gate nothing."
   },
-  "stages": {},
+  "stages": {
+    "chunking": 1.0,
+    "entity_resolution": 1.0,
+    "conflict_detection": 1.0
+  },
   "end_to_end": null
 }

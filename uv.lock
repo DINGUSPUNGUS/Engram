@@ -224,6 +224,7 @@ dependencies = [
     { name = "engram-core" },
     { name = "engram-events" },
     { name = "engram-export-git" },
+    { name = "engram-intelligence" },
     { name = "engram-storage-sqlite" },
     { name = "pydantic-settings" },
     { name = "typer" },
@@ -234,6 +235,7 @@ requires-dist = [
     { name = "engram-core", editable = "libs/engram-core" },
     { name = "engram-events", editable = "libs/engram-events" },
     { name = "engram-export-git", editable = "libs/engram-export-git" },
+    { name = "engram-intelligence", editable = "libs/engram-intelligence" },
     { name = "engram-storage-sqlite", editable = "libs/engram-storage-sqlite" },
     { name = "pydantic-settings", specifier = ">=2.7.0" },
     { name = "typer", specifier = ">=0.15.0" },
@@ -287,12 +289,16 @@ source = { editable = "libs/engram-intelligence" }
 dependencies = [
     { name = "engram-core" },
     { name = "engram-events" },
+    { name = "httpx" },
+    { name = "pyyaml" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "engram-core", editable = "libs/engram-core" },
     { name = "engram-events", editable = "libs/engram-events" },
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "pyyaml", specifier = ">=6.0" },
 ]
 
 [[package]]

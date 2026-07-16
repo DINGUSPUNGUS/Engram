@@ -1,11 +1,11 @@
 # engram
 
 > **Status: pre-alpha.** The event core works (M1), the query engine works (M2), the
-> space is portable (M3), and every mutation now flows through a **review pipeline**
-> (M4): external edits reconcile into edit proposals — never duplicates — and
-> `engram proposals approve/merge/undo` is the only way imported knowledge becomes
-> memory. The AI pipeline and the surfaces land milestone by milestone
-> ([roadmap](docs/roadmap.md)).
+> space is portable (M3), every mutation flows through a **review pipeline** (M4), and
+> the **intelligence pipeline is live** (M5): `engram ingest` extracts typed, evidence-
+> cited memory candidates from conversations — locally, via Ollama — and its only power
+> is to open a proposal. AI proposes; events decide. The assistant integrations and
+> surfaces land milestone by milestone ([roadmap](docs/roadmap.md)).
 
 **engram** is a local-first, user-owned memory engine for AI assistants. It lets ChatGPT,
 Claude, Gemini, Cursor, Copilot, Ollama, and anything else that speaks MCP or REST share a
@@ -94,6 +94,12 @@ uv run engram export         # deterministic markdown+NDJSON repo (~/.engram/mem
 uv run engram git init       # version it; `engram git commit` = export + commit
 uv run engram import ./notes.md          # validated → opens a PROPOSAL, never a write
 uv run engram import --restore <repo>    # rebuild an empty space losslessly
+
+uv run engram ingest ./conversation.txt  # the AI pipeline (Ollama, local): extract →
+                                         # resolve → score → ONE proposal, never a write
+uv run engram confirm <id>               # vouch: confidence rises (policy-weighted)
+uv run engram contradict <id> --by <id>  # dispute: confidence decays + contradicts edge
+uv run engram importance <id> --pin -w 0.9   # importance signals (scores stay derived)
 
 uv run engram proposals list             # the review queue
 uv run engram proposals show <id>        # inspect every draft intent

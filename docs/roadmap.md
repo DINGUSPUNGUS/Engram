@@ -70,16 +70,31 @@ and replay determinism holds across the full import→merge→undo lifecycle.
 Deferred within the spine: confirm/contradict/importance (they are scoring-policy
 judgments — they land with M5's scoring work).
 
-## M5 — Intelligence Pipeline
+## M5 — Intelligence Pipeline ✅ (core; two items remain)
 
-Implements M1's frozen contracts ([intelligence.md](intelligence.md)): Ollama provider
-first (local-first reference), then evidence extraction → entity resolution → candidate
-generation → conflict detection, each gated by the golden suite (ADR-0014). Decay
-scoring from `MemoryAccessed` history, the synthetic-corpus generator, duplicate
-detection. Semantic search lands here too — `EmbeddingProvider` implementations and a
-sqlite-vec projection joining the query engine as new operators behind the
-`supports_vectors` capability flag. Invariants: no AI-affecting change merges below
-baseline; FTS-only installs remain first-class (Windows).
+Implements M1's frozen contracts ([intelligence.md](intelligence.md), ADR-0019):
+`engram ingest` runs the seven stages — TurnChunker → LLMEvidenceExtractor (verbatim
+quotes or nothing) → HeuristicEntityResolver (alias sets, never guesses) →
+LLMCandidateGenerator (KindRegistry-validated, evidence-cited or dropped) →
+RuleConflictDetector (§8 duplicate/contradiction classes, deterministic) →
+PolicyImportanceScorer (every number from `scoring.py`) → DraftProposalAssembler
+(ONE proposal of draft intents; duplicates reconcile, contradictions are stated
+with `contradict_memory` + `supersedes`, never resolved). **Ollama provider first**
+(plain HTTP, `seed` + temperature 0 pinned, bounded retry at the boundary only);
+`fake` provider replays canned responses for reproducible CI/demos. Every run's
+explanation (provider, model ids, prompt versions, seed, counts, notes) rides
+`Provenance.detail` on `ProposalOpened`. The spine scoring landed with it:
+confirm/contradict/importance commands + intents (decide-time policy weights
+recorded in events), `MemoryConfidenceRestored` undo compensation, decay
+(`effective_confidence`, `is:stale`) and retention scoring from `MemoryAccessed`
+history (`show --track`). The golden suite runs for real: deterministic stages
+gate CI against `results/baseline.json`; LLM-stage evaluators activate per
+provider+model configuration.
+**Invariant green**: no AI-affecting change merges below baseline; the pipeline is
+side-effect free until merge; replay determinism holds across the full
+ingest→merge→undo lifecycle; FTS-only installs remain first-class (Windows).
+**Remaining in scope, not yet landed**: semantic search (`EmbeddingProvider` +
+sqlite-vec behind `supports_vectors`) and the seeded synthetic-corpus generator.
 
 ## M6 — Assistant Integrations
 

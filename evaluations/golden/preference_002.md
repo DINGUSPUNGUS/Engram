@@ -14,8 +14,10 @@ USER: For print stylesheets keep everything light though, obviously.
 ## Expected
 
 ```yaml
-# Assumes an existing preference memory (prefers light mode, context: dashboard)
-# is present in the fixture state.
+existing:  # fixture state the case assumes (seeded by the eval harness)
+  - kind: preference
+    title: "Prefers light mode for the dashboard"
+    attributes: { polarity: prefers, context: "dashboard theme" }
 candidates:
   - kind: preference
     attributes: { polarity: prefers, context: "dashboard theme" }

@@ -5,11 +5,11 @@ signals and the scoring constants — never stored (ADR-0009).
 """
 
 import json
-import math
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from uuid import UUID
 
+from sqlalchemy import func
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import Session, col, select
@@ -35,19 +35,8 @@ from engram_storage_sqlite.models import (
     ProposalRecord,
 )
 
-_SECONDS_PER_DAY = 86_400.0
-
-
-def effective_confidence(
-    confidence: float,
-    kind: MemoryKind,
-    anchor: datetime,
-    now: datetime,
-    config: scoring.ScoringConfig,
-) -> float:
-    """c_eff = c * 2^(-days_since_anchor / half_life_days) (memory-model.md §5)."""
-    days = max((now - anchor).total_seconds() / _SECONDS_PER_DAY, 0.0)
-    return confidence * math.pow(2.0, -days / config.half_life_days[kind])
+#: Formula moved to the one tunable module (ADR-0009); re-exported for callers.
+effective_confidence = scoring.effective_confidence
 
 
 class SqliteMemoryQuery:
@@ -185,6 +174,21 @@ class SqliteMemoryQuery:
         now = datetime.now(UTC)
         anchor = from_naive_utc(record.last_confirmed_at or record.created_at)
         c_eff = effective_confidence(record.confidence, kind, anchor, now, self._config)
+        inbound = session.exec(
+            select(func.count(col(LinkRecord.source_id))).where(LinkRecord.target_id == record.id)
+        ).one()
+        retention = scoring.retention_score(
+            kind=kind,
+            effective_confidence=c_eff,
+            last_accessed_at=(
+                from_naive_utc(record.last_accessed_at) if record.last_accessed_at else None
+            ),
+            access_count=record.access_count,
+            link_degree=len(links) + int(inbound),
+            user_weight=record.user_weight,
+            now=now,
+            config=self._config,
+        )
         attributes: dict[str, object] = json.loads(record.attributes)
         return MemoryReadModel(
             id=MemoryId(UUID(record.id)),
@@ -209,6 +213,11 @@ class SqliteMemoryQuery:
             visibility=record.visibility,
             pinned=record.pinned,
             user_weight=record.user_weight,
+            access_count=record.access_count,
+            last_accessed_at=(
+                from_naive_utc(record.last_accessed_at) if record.last_accessed_at else None
+            ),
+            retention_score=retention,
             archived=record.archived,
             created_by=record.created_by,
             created_at=from_naive_utc(record.created_at),

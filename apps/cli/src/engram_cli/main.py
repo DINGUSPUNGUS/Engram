@@ -162,6 +162,10 @@ def show(
         int | None,
         typer.Option("--version", "-v", min=1, help="Time travel: state after event #N"),
     ] = None,
+    track: Annotated[
+        bool,
+        typer.Option("--track", help="Record a MemoryAccessed event (feeds retention scoring)"),
+    ] = False,
 ) -> None:
     """Show one memory in full, including its event timeline.
 
@@ -174,6 +178,8 @@ def show(
         if at is not None or version is not None:
             _show_snapshot(runtime, MemoryId(memory_id), at, version)
             return
+        if track:
+            runtime.commands.record_access(MemoryId(memory_id), "cli-show", _provenance())
         memory = runtime.queries.get_memory(MemoryId(memory_id))
         typer.echo(f"{memory.kind.value}: {memory.title}")
         typer.echo(f"id: {memory.id}   slug: {memory.slug}   version: {memory.version}")
@@ -182,6 +188,14 @@ def show(
             f" (effective {memory.effective_confidence:.2f}"
             f"{', STALE' if memory.stale else ''})"
         )
+        importance_bits = [f"retention {memory.retention_score:.2f}"]
+        if memory.pinned:
+            importance_bits.append("pinned")
+        if memory.user_weight is not None:
+            importance_bits.append(f"user weight {memory.user_weight:.2f}")
+        if memory.access_count:
+            importance_bits.append(f"{memory.access_count} access(es)")
+        typer.echo(f"importance: {'   '.join(importance_bits)}")
         typer.echo(f"lifetime: {memory.lifetime_policy}   visibility: {memory.visibility}")
         if memory.tags:
             typer.echo(f"tags: {', '.join(memory.tags)}")
@@ -398,6 +412,142 @@ def link(
             MemoryId(source_id), MemoryId(target_id), resolved, _provenance()
         )
         typer.secho(f"linked {source_id} -{relation}-> {target_id}", fg=typer.colors.GREEN)
+
+    _run(action)
+
+
+@app.command()
+def confirm(
+    memory_id: Annotated[UUID, typer.Argument(help="The memory to vouch for")],
+    note: Annotated[str | None, typer.Option("--note", "-n")] = None,
+) -> None:
+    """Vouch for a memory: raises confidence toward 1 and resets staleness.
+
+    The weight applied comes from the scoring policy (user > assistant) and is
+    recorded in the event (ADR-0019)."""
+
+    def action() -> None:
+        runtime = _runtime()
+        runtime.commands.confirm_memory(MemoryId(memory_id), note, _provenance())
+        memory = runtime.queries.get_memory(MemoryId(memory_id))
+        typer.secho(
+            f"confirmed {memory.slug}: confidence {memory.confidence:.2f}",
+            fg=typer.colors.GREEN,
+        )
+
+    _run(action)
+
+
+@app.command()
+def contradict(
+    memory_id: Annotated[UUID, typer.Argument(help="The memory being disputed")],
+    by: Annotated[
+        UUID | None, typer.Option("--by", help="The memory that contradicts it (adds an edge)")
+    ] = None,
+    note: Annotated[str | None, typer.Option("--note", "-n")] = None,
+) -> None:
+    """Dispute a memory: decays confidence multiplicatively and (with --by)
+    creates a contradicts edge. Resolution stays with review — nothing is
+    silently superseded (memory-model.md §8)."""
+
+    def action() -> None:
+        runtime = _runtime()
+        runtime.commands.contradict_memory(
+            MemoryId(memory_id), MemoryId(by) if by is not None else None, note, _provenance()
+        )
+        memory = runtime.queries.get_memory(MemoryId(memory_id))
+        typer.secho(
+            f"contradicted {memory.slug}: confidence {memory.confidence:.2f}"
+            f"{' (STALE)' if memory.stale else ''}",
+            fg=typer.colors.YELLOW,
+        )
+
+    _run(action)
+
+
+@app.command()
+def importance(
+    memory_id: Annotated[UUID, typer.Argument()],
+    pin: Annotated[bool | None, typer.Option("--pin/--unpin", help="Exempt from pruning")] = None,
+    weight: Annotated[
+        float | None, typer.Option("--weight", "-w", min=0.0, max=1.0, help="Explicit 0..1 weight")
+    ] = None,
+    clear_weight: Annotated[
+        bool, typer.Option("--clear-weight", help="Reset the explicit weight to unset")
+    ] = False,
+) -> None:
+    """Adjust importance signals: pin/unpin or the explicit user weight.
+    Scores stay derived — this records signals (ADR-0009)."""
+
+    def action() -> None:
+        runtime = _runtime()
+        runtime.commands.adjust_importance(
+            MemoryId(memory_id),
+            pinned=pin,
+            user_weight=weight,
+            clear_user_weight=clear_weight,
+            provenance=_provenance(),
+        )
+        memory = runtime.queries.get_memory(MemoryId(memory_id))
+        bits = ["pinned" if memory.pinned else "unpinned"]
+        if memory.user_weight is not None:
+            bits.append(f"weight {memory.user_weight:.2f}")
+        typer.secho(
+            f"importance of {memory.slug}: {', '.join(bits)}"
+            f" (retention {memory.retention_score:.2f})",
+            fg=typer.colors.GREEN,
+        )
+
+    _run(action)
+
+
+@app.command()
+def ingest(
+    source: Annotated[Path, typer.Argument(help="Transcript file (USER:/ASSISTANT: lines)")],
+    actor: Annotated[
+        str, typer.Option("--actor", help="Which assistant had this conversation (provenance)")
+    ] = "assistant",
+    session: Annotated[
+        str | None, typer.Option("--session", help="Session id (provenance)")
+    ] = None,
+) -> None:
+    """Run the intelligence pipeline over a conversation transcript.
+
+    The pipeline extracts evidence, resolves entities, drafts typed candidates,
+    detects conflicts, scores, and opens ONE proposal — it never writes memory
+    directly. Review with `engram proposals show`, then approve + merge.
+    Provider selection: ENGRAM_LLM_PROVIDER (default: ollama, local-first)."""
+
+    def action() -> None:
+        from engram_cli.ingestion import build_pipeline, parse_transcript_file
+
+        settings = CliSettings()
+        runtime = _runtime()
+        pipeline = build_pipeline(runtime, settings)
+        transcript = parse_transcript_file(
+            source, Provenance(actor=actor, session_id=session, detail="engram-cli ingest")
+        )
+        outcome = pipeline.ingest(transcript)
+        if outcome.proposal_id is None:
+            typer.echo(
+                f"nothing to propose ({outcome.candidate_count} candidate(s),"
+                f" {outcome.conflict_count} conflict(s))"
+            )
+            for reason in outcome.skipped_reasons:
+                typer.secho(f"  {reason}", dim=True)
+            return
+        typer.secho(
+            f"opened proposal {outcome.proposal_id}: {outcome.candidate_count} candidate(s),"
+            f" {outcome.conflict_count} conflict(s)",
+            fg=typer.colors.GREEN,
+        )
+        for reason in outcome.skipped_reasons:
+            typer.secho(f"  note: {reason}", dim=True)
+        typer.echo(
+            f"review it: engram proposals show {outcome.proposal_id}"
+            f" && engram proposals approve {outcome.proposal_id}"
+            f" && engram proposals merge {outcome.proposal_id}"
+        )
 
     _run(action)
 

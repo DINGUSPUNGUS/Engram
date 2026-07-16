@@ -35,11 +35,12 @@ Justification spine (memory-model.md §3, §5):
 
 | Event | Emitted when | Payload highlights |
 | --- | --- | --- |
-| `MemoryConfirmed` | Someone vouched for it | note; raises confidence, resets staleness |
-| `MemoryContradicted` | Someone disputed it | contradicting_id, note; lowers confidence |
+| `MemoryConfirmed` | Someone vouched for it | note, **weight** (resolved from policy at decide time — ADR-0019); fold: c' = c + (1−c)·w, resets staleness |
+| `MemoryContradicted` | Someone disputed it | contradicting_id, note, **weight**; fold: c' = c·(1−w); a companion `MemoryLinked` carries the contradicts edge |
+| `MemoryConfidenceRestored` | Undo compensated a confirm/contradict (ADR-0019 §2) | confidence, last_confirmed_at, reason — emitted ONLY by proposal undo, no command produces it |
 | `MemoryEvidenceAdded` | Support attached | evidence_type, value, note (append-only) |
 | `MemoryEvidenceRetracted` | Undo compensated an evidence addition (ADR-0018) | seq (1-based add order), reason — the log keeps both the evidence and its retraction |
-| `MemoryImportanceAdjusted` | Pin/unpin, explicit weight | pinned?, user_weight? |
+| `MemoryImportanceAdjusted` | Pin/unpin, explicit weight | pinned?, user_weight?, clear_user_weight (restoring "unset" is expressible — ADR-0019) |
 | `MemoryVisibilityChanged` | Recall audience changes | visibility, allowed_actors |
 | `MemoryLifetimeChanged` | Retention policy changes | policy, until |
 
@@ -60,6 +61,11 @@ Organization & lifecycle:
 `ProposalApproved`, `ProposalRejected`, `ProposalMerged` (with the ids of the
 aggregate-decided events appended in the same atomic batch), and `ProposalUndone`
 (with the ids of the compensating events; ADR-0018 §3 — history is never rewritten).
+
+Pipeline-opened proposals carry their full run explanation — provider, model ids,
+prompt versions, seed, stage counts, scoring notes — as JSON in the opening
+envelope's `Provenance.detail` (ADR-0019 §3). It is metadata: replayed verbatim,
+folded by nothing.
 
 ### Forward compatibility (accepted extension)
 

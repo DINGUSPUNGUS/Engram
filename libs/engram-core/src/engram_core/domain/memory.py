@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from engram_core.domain import events as ev
+from engram_core.domain import scoring
 from engram_core.domain.errors import ConflictError, ValidationError
 from engram_core.domain.kinds import KindAttributes, KindRegistry
 from engram_core.domain.values import (
@@ -158,6 +159,29 @@ class Memory:
             case ev.MemoryUnlinked():
                 gone = Link(MemoryId(payload.target_id), LinkRelation(payload.relation))
                 changes = {"links": tuple(link for link in self.links if link != gone)}
+            case ev.MemoryConfirmed():
+                changes = {
+                    "confidence": scoring.confirm_confidence(self.confidence, payload.weight),
+                    "last_confirmed_at": envelope.occurred_at,
+                }
+            case ev.MemoryContradicted():
+                changes = {
+                    "confidence": scoring.contradict_confidence(self.confidence, payload.weight)
+                }
+            case ev.MemoryConfidenceRestored():
+                changes = {
+                    "confidence": payload.confidence,
+                    "last_confirmed_at": payload.last_confirmed_at,
+                }
+            case ev.MemoryImportanceAdjusted():
+                signals = self.importance
+                if payload.pinned is not None:
+                    signals = dataclasses.replace(signals, pinned=payload.pinned)
+                if payload.clear_user_weight:
+                    signals = dataclasses.replace(signals, user_weight=None)
+                elif payload.user_weight is not None:
+                    signals = dataclasses.replace(signals, user_weight=payload.user_weight)
+                changes = {"importance": signals}
             case ev.MemoryEvidenceAdded():
                 added = EvidenceRef(
                     EvidenceType(payload.evidence_type), payload.value, payload.note
@@ -356,15 +380,47 @@ class Memory:
             ),
         )
 
-    def decide_confirm(self, note: str | None = None) -> Sequence[object]:
-        """Produce ``MemoryConfirmed`` (M4)."""
-        raise NotImplementedError
+    def decide_confirm(self, weight: float, note: str | None = None) -> Sequence[object]:
+        """Produce ``MemoryConfirmed``. ``weight`` is the confirmer's weight,
+        resolved from the scoring policy by the caller (ADR-0019 — the resolved
+        magnitude is recorded so replay never depends on live config).
+
+        Raises:
+            ValidationError: weight outside [0,1].
+        """
+        self._require_live()
+        if not 0.0 <= weight <= 1.0:
+            raise ValidationError(f"confirmation weight out of [0,1]: {weight}")
+        return (ev.MemoryConfirmed(note=note, weight=weight),)
 
     def decide_contradict(
-        self, contradicting_id: MemoryId | None = None, note: str | None = None
+        self,
+        weight: float,
+        contradicting_id: MemoryId | None = None,
+        note: str | None = None,
     ) -> Sequence[object]:
-        """Produce ``MemoryContradicted`` (M4)."""
-        raise NotImplementedError
+        """Produce ``MemoryContradicted`` plus, when the disputing memory is
+        named and not yet linked, the companion ``contradicts`` edge
+        (memory-model.md §5).
+
+        Raises:
+            ValidationError: weight outside [0,1], or self-contradiction.
+        """
+        self._require_live()
+        if not 0.0 <= weight <= 1.0:
+            raise ValidationError(f"contradiction weight out of [0,1]: {weight}")
+        if contradicting_id == self.id:
+            raise ValidationError("a memory cannot contradict itself")
+        payloads: list[object] = [
+            ev.MemoryContradicted(contradicting_id=contradicting_id, note=note, weight=weight)
+        ]
+        if contradicting_id is not None:
+            edge = Link(contradicting_id, LinkRelation.CONTRADICTS)
+            if edge not in self.links:
+                payloads.append(
+                    ev.MemoryLinked(target_id=contradicting_id, relation=edge.relation.value)
+                )
+        return tuple(payloads)
 
     def decide_add_evidence(self, evidence: EvidenceRef) -> Sequence[object]:
         """Produce ``MemoryEvidenceAdded``. Evidence is append-only — corrections
@@ -379,10 +435,40 @@ class Memory:
         )
 
     def decide_adjust_importance(
-        self, *, pinned: bool | None = None, user_weight: float | None = None
+        self,
+        *,
+        pinned: bool | None = None,
+        user_weight: float | None = None,
+        clear_user_weight: bool = False,
     ) -> Sequence[object]:
-        """Produce ``MemoryImportanceAdjusted`` (M4)."""
-        raise NotImplementedError
+        """Produce ``MemoryImportanceAdjusted``; no-op adjustments produce no
+        events. ``clear_user_weight`` resets the explicit weight to unset.
+
+        Raises:
+            ValidationError: user_weight outside [0,1], weight both set and
+                cleared, or nothing requested.
+        """
+        self._require_live()
+        if user_weight is not None and clear_user_weight:
+            raise ValidationError("cannot set and clear user_weight in one adjustment")
+        if user_weight is not None and not 0.0 <= user_weight <= 1.0:
+            raise ValidationError(f"user_weight out of [0,1]: {user_weight}")
+        if pinned is None and user_weight is None and not clear_user_weight:
+            raise ValidationError("importance adjustment requests no change")
+        effective_pin = pinned if pinned is not None and pinned != self.importance.pinned else None
+        wants_clear = clear_user_weight and self.importance.user_weight is not None
+        new_weight = (
+            user_weight
+            if user_weight is not None and user_weight != self.importance.user_weight
+            else None
+        )
+        if effective_pin is None and new_weight is None and not wants_clear:
+            return ()
+        return (
+            ev.MemoryImportanceAdjusted(
+                pinned=effective_pin, user_weight=new_weight, clear_user_weight=wants_clear
+            ),
+        )
 
     def decide_set_visibility(
         self, visibility: Visibility, allowed_actors: Sequence[str] = ()

@@ -118,6 +118,36 @@ class AddEvidenceDraft:
 
 
 @dataclass(frozen=True, slots=True)
+class ConfirmMemoryDraft:
+    """Vouch for an existing memory. The weight is NOT stored here — proposals
+    are automation's door, so merge resolves the assistant-class weight from the
+    scoring policy at merge time (ADR-0019 §1)."""
+
+    memory_id: UUID
+    base_version: int | None
+    note: str | None = None
+
+    @property
+    def stream_id(self) -> UUID:
+        return self.memory_id
+
+
+@dataclass(frozen=True, slots=True)
+class ContradictMemoryDraft:
+    """Dispute an existing memory, optionally naming the disputing memory
+    (which may be another candidate created in the same proposal)."""
+
+    memory_id: UUID
+    base_version: int | None
+    contradicting_id: UUID | None = None
+    note: str | None = None
+
+    @property
+    def stream_id(self) -> UUID:
+        return self.memory_id
+
+
+@dataclass(frozen=True, slots=True)
 class SetVisibilityDraft:
     memory_id: UUID
     base_version: int | None
@@ -149,6 +179,8 @@ DraftIntent = (
     | LinkDraft
     | UnlinkDraft
     | AddEvidenceDraft
+    | ConfirmMemoryDraft
+    | ContradictMemoryDraft
     | SetVisibilityDraft
     | SetLifetimeDraft
 )
@@ -161,6 +193,8 @@ _OPS: dict[str, type] = {
     "link_memories": LinkDraft,
     "unlink_memories": UnlinkDraft,
     "add_evidence": AddEvidenceDraft,
+    "confirm_memory": ConfirmMemoryDraft,
+    "contradict_memory": ContradictMemoryDraft,
     "set_visibility": SetVisibilityDraft,
     "set_lifetime": SetLifetimeDraft,
 }
@@ -205,6 +239,8 @@ def parse_draft(record: dict[str, Any]) -> DraftIntent:
             value = record.get(field.name)
             if field.name in ("memory_id", "source_id", "target_id"):
                 value = UUID(str(value))
+            elif field.name == "contradicting_id":
+                value = UUID(str(value)) if value is not None else None
             elif field.name in ("tags", "add", "remove", "allowed_actors"):
                 value = tuple(value or ())
             elif field.name in ("attributes", "changes"):

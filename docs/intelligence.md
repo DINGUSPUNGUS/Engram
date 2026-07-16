@@ -1,10 +1,12 @@
 # Intelligence Architecture
 
-**Status: the Phase 0.75 deliverable.** How AI enters engram — and, more importantly, the
-walls that keep it honest. Companion decisions:
-[ADR-0012](adr/0012-llm-provider-abstraction.md) (providers are adapters; the core never
-knows a model exists), [ADR-0013](adr/0013-prompts-as-code.md) (prompts are versioned
-artifacts), [ADR-0014](adr/0014-evaluation-gate.md) (AI changes must beat the baseline).
+**Status: designed in Phase 0.75, implemented in M5** (`engram ingest`; stages 1–7 live,
+Ollama + fake providers, golden gate active for deterministic stages). Companion
+decisions: [ADR-0012](adr/0012-llm-provider-abstraction.md) (providers are adapters; the
+core never knows a model exists), [ADR-0013](adr/0013-prompts-as-code.md) (prompts are
+versioned artifacts), [ADR-0014](adr/0014-evaluation-gate.md) (AI changes must beat the
+baseline), [ADR-0019](adr/0019-policy-driven-scoring-and-pipeline-provenance.md)
+(decide-time scoring; pipeline runs are provenance).
 
 The prime directive, inherited from ADR-0011: **AI proposes; events decide.** No pipeline
 stage, no model, no score ever writes to a memory stream directly. The pipeline's single

@@ -170,4 +170,5 @@ def test_fold_rejects_malformed_streams() -> None:
     with pytest.raises(ValidationError):  # stream must start with MemoryCreated
         Memory.fold([envelope(memory.id, 1, ev.MemoryEdited(title="x"))], KINDS)
     with pytest.raises(ValidationError):  # future-phase event types must not fold silently
-        memory.evolve(envelope(memory.id, 2, ev.MemoryConfirmed()))
+        merged = ev.MemoryMerged(source_id=memory.id, merged_content="")
+        memory.evolve(envelope(memory.id, 2, merged))

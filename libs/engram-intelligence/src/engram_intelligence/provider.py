@@ -5,8 +5,14 @@ responses is recorded for provenance ONLY — no code in engram may branch on it
 stage needs a capability, it asks the flags, never the vendor name.
 """
 
+import json
 from dataclasses import dataclass
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
+
+from engram_core.domain.errors import StorageError
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,12 +70,29 @@ class LLMProvider(Protocol):
 class FakeProvider:
     """Deterministic provider for tests and golden-set runs of non-LLM concerns.
 
-    Returns canned responses keyed by prompt name; unknown prompts get the default.
+    Returns canned responses keyed by prompt name; unknown prompts get the
+    default. ``from_json_file`` loads the canned map from disk so end-to-end
+    demos and CI runs are reproducible without any model installed.
     """
 
     def __init__(self, responses: dict[str, str] | None = None, default: str = "") -> None:
         self._responses = dict(responses or {})
         self._default = default
+
+    @classmethod
+    def from_json_file(cls, path: "Path") -> "FakeProvider":
+        """Load ``{prompt_name: response_text}`` from a JSON file.
+
+        Raises:
+            StorageError: unreadable file or non-object JSON.
+        """
+        try:
+            data = json.loads(path.read_text(encoding="utf-8-sig"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise StorageError(f"cannot load fake-provider responses from {path}: {exc}") from exc
+        if not isinstance(data, dict):
+            raise StorageError(f"fake-provider responses must be a JSON object: {path}")
+        return cls({str(k): str(v) for k, v in data.items()})
 
     @property
     def name(self) -> str:

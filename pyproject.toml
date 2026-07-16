@@ -124,6 +124,7 @@ source_modules = [
     "engram_intelligence.pipeline",
     "engram_intelligence.prompts",
     "engram_intelligence.evals",
+    "engram_intelligence.evaluators",
     "engram_intelligence.provider",
     "engram_api",
     "engram_cli",

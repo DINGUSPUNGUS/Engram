@@ -8,7 +8,11 @@ proposals reference them (``prompt_name@version`` in proposal metadata).
 from dataclasses import dataclass
 from pathlib import Path
 
+import yaml
+
 from engram_core.domain.errors import ValidationError
+
+_LIBRARY_DIR = Path(__file__).parent / "library"
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,10 +77,44 @@ class PromptRegistry:
         return tuple(sorted(v for (n, v) in self._templates if n == name))
 
 
-def load_library(directory: Path) -> PromptRegistry:
+def load_library(directory: Path | None = None) -> PromptRegistry:
     """Load every ``*.md`` prompt file (YAML frontmatter + body) into a registry.
 
-    Format of record: docs/intelligence.md §3; example in ``library/``.
-    Implementation lands with the pipeline (milestone M5).
+    Format of record: docs/intelligence.md §3. Defaults to the shipped library.
+
+    Raises:
+        ValidationError: malformed frontmatter, missing required keys, or a
+            duplicate (name, version).
     """
-    raise NotImplementedError
+    registry = PromptRegistry()
+    for path in sorted((directory or _LIBRARY_DIR).glob("*.md")):
+        registry.register(_parse_prompt_file(path))
+    return registry
+
+
+def _parse_prompt_file(path: Path) -> PromptTemplate:
+    text = path.read_text(encoding="utf-8-sig")
+    if not text.startswith("---"):
+        raise ValidationError(f"prompt file has no frontmatter: {path.name}")
+    try:
+        _, frontmatter, body = text.split("---", 2)
+    except ValueError:
+        raise ValidationError(f"prompt frontmatter is unterminated: {path.name}") from None
+    try:
+        meta = yaml.safe_load(frontmatter)
+    except yaml.YAMLError as exc:
+        raise ValidationError(f"prompt frontmatter is not YAML ({path.name}): {exc}") from exc
+    if not isinstance(meta, dict):
+        raise ValidationError(f"prompt frontmatter must be a mapping: {path.name}")
+    missing = [key for key in ("name", "version", "author", "stage") if key not in meta]
+    if missing:
+        raise ValidationError(f"prompt {path.name} lacks frontmatter keys: {', '.join(missing)}")
+    return PromptTemplate(
+        name=str(meta["name"]),
+        version=int(meta["version"]),
+        author=str(meta["author"]),
+        stage=str(meta["stage"]),
+        body=body.strip("\n"),
+        expected_output=str(meta.get("expected_output", "")),
+        model_hints=tuple(str(hint) for hint in meta.get("model_hints", ())),
+    )

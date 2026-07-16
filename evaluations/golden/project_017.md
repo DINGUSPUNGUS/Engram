@@ -14,8 +14,10 @@ USER: Right. And park the old "memory manager" name for good — it's engram eve
 ## Expected
 
 ```yaml
-# Assumes an existing project memory (status: idea, name mentions "memory manager")
-# is present in the fixture state.
+existing:  # fixture state the case assumes (seeded by the eval harness)
+  - kind: project
+    title: "memory manager"  # old working title; attributes carry the real name
+    attributes: { name: "engram", status: "idea" }
 candidates:
   - kind: project
     attributes:

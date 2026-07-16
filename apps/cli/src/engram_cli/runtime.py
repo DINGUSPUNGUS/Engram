@@ -36,6 +36,7 @@ from engram_storage_sqlite.status import SpaceStatus, space_status
 class Runtime:
     engine: Engine
     store: SqliteEventStore
+    query_engine: SqliteQueryEngine
     state_projection: StateProjection
     search_projection: SearchProjection
     proposals_projection: ProposalProjection
@@ -91,6 +92,7 @@ def build_runtime(settings: CliSettings) -> Runtime:
     return Runtime(
         engine=engine,
         store=store,
+        query_engine=query,
         state_projection=state,
         search_projection=search,
         proposals_projection=proposals_projection,

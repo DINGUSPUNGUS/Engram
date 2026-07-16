@@ -74,17 +74,34 @@ class MemoryEditedExternally:
 
 @dataclass(frozen=True, slots=True)
 class MemoryConfirmed:
-    """Someone vouched for this memory: raises confidence, resets staleness."""
+    """Someone vouched for this memory: raises confidence (c' = c + (1-c)·w),
+    resets staleness. ``weight`` is resolved from the scoring policy at decide
+    time and recorded here so replay never depends on live config (ADR-0019)."""
 
     note: str | None = None
+    weight: float = 0.40
 
 
 @dataclass(frozen=True, slots=True)
 class MemoryContradicted:
-    """Someone disputed this memory: lowers confidence, creates a contradicts edge."""
+    """Someone disputed this memory: lowers confidence (c' = c·(1-w)); the
+    contradicts edge is a companion ``MemoryLinked`` event. ``weight`` is
+    resolved at decide time and recorded (ADR-0019)."""
 
     contradicting_id: UUID | None = None
     note: str | None = None
+    weight: float = 0.40
+
+
+@dataclass(frozen=True, slots=True)
+class MemoryConfidenceRestored:
+    """Confidence inputs restored to recorded prior values. Emitted ONLY by
+    proposal undo when compensating a confirm/contradict (ADR-0019 §2, the
+    ``MemoryEvidenceRetracted`` precedent) — no command produces it."""
+
+    confidence: float
+    last_confirmed_at: datetime | None = None
+    reason: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,10 +123,13 @@ class MemoryEvidenceRetracted:
 
 @dataclass(frozen=True, slots=True)
 class MemoryImportanceAdjusted:
-    """Pin/unpin or set an explicit user weight. ``None`` means "unchanged"."""
+    """Pin/unpin or set an explicit user weight. ``None`` means "unchanged";
+    clearing an existing weight back to unset is ``clear_user_weight=True``
+    (needed so undo can restore "no weight" — ADR-0019)."""
 
     pinned: bool | None = None
     user_weight: float | None = None
+    clear_user_weight: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -233,6 +253,7 @@ _EVENT_TYPES: dict[str, type] = {
     "MemoryEditedExternally": MemoryEditedExternally,
     "MemoryConfirmed": MemoryConfirmed,
     "MemoryContradicted": MemoryContradicted,
+    "MemoryConfidenceRestored": MemoryConfidenceRestored,
     "MemoryEvidenceAdded": MemoryEvidenceAdded,
     "MemoryEvidenceRetracted": MemoryEvidenceRetracted,
     "MemoryImportanceAdjusted": MemoryImportanceAdjusted,

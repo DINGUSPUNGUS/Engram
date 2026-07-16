@@ -39,8 +39,9 @@ class EvidenceView:
 class MemoryReadModel:
     """Current state of one memory, as projected — spine included.
 
-    ``effective_confidence`` and ``stale`` are *derived* by the scoring projection
-    (ADR-0009); ``attributes`` is the kind-schema dict, already validated on write.
+    ``effective_confidence``, ``stale``, and ``retention_score`` are *derived* at
+    read time from stored signals (ADR-0009); ``attributes`` is the kind-schema
+    dict, already validated on write.
     """
 
     id: MemoryId
@@ -61,6 +62,9 @@ class MemoryReadModel:
     visibility: str
     pinned: bool
     user_weight: float | None
+    access_count: int
+    last_accessed_at: datetime | None
+    retention_score: float
     archived: bool
     created_by: str
     created_at: datetime

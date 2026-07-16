@@ -22,6 +22,7 @@ from uuid import UUID
 
 from engram_core.application.commands import drafts as d
 from engram_core.domain import events as ev
+from engram_core.domain import scoring
 from engram_core.domain.errors import (
     ConflictError,
     NotFoundError,
@@ -302,6 +303,21 @@ class ProposalCommandService:
                 return state.decide_add_evidence(
                     EvidenceRef(EvidenceType(intent.evidence_type), intent.value, intent.note)
                 )
+            case d.ConfirmMemoryDraft():
+                # Proposals are automation's door: merge always applies the
+                # assistant-class weight, never the approver's (ADR-0019 §1).
+                return state.decide_confirm(scoring.CONFIRM_WEIGHT_ASSISTANT, intent.note)
+            case d.ContradictMemoryDraft():
+                if intent.contradicting_id is not None:
+                    self._require_target(intent.contradicting_id, cursors)
+                contradicting = (
+                    MemoryId(intent.contradicting_id)
+                    if intent.contradicting_id is not None
+                    else None
+                )
+                return state.decide_contradict(
+                    scoring.CONTRADICT_WEIGHT_ASSISTANT, contradicting, intent.note
+                )
             case d.SetVisibilityDraft():
                 return state.decide_set_visibility(
                     Visibility(intent.visibility), intent.allowed_actors
@@ -390,6 +406,21 @@ class ProposalCommandService:
                 return ev.MemoryLinked(target_id=payload.target_id, relation=payload.relation)
             case ev.MemoryEvidenceAdded() if prior is not None:
                 return ev.MemoryEvidenceRetracted(seq=len(prior.evidence) + 1, reason=reason)
+            case ev.MemoryConfirmed() | ev.MemoryContradicted() if prior is not None:
+                # The only producer of MemoryConfidenceRestored (ADR-0019 §2).
+                return ev.MemoryConfidenceRestored(
+                    confidence=prior.confidence,
+                    last_confirmed_at=prior.last_confirmed_at,
+                    reason=reason,
+                )
+            case ev.MemoryImportanceAdjusted() if prior is not None:
+                prior_weight = prior.importance.user_weight
+                touched_weight = payload.user_weight is not None or payload.clear_user_weight
+                return ev.MemoryImportanceAdjusted(
+                    pinned=prior.importance.pinned if payload.pinned is not None else None,
+                    user_weight=prior_weight if touched_weight else None,
+                    clear_user_weight=touched_weight and prior_weight is None,
+                )
             case ev.MemoryVisibilityChanged() if prior is not None:
                 return ev.MemoryVisibilityChanged(
                     visibility=prior.visibility.value, allowed_actors=prior.allowed_actors

@@ -76,6 +76,8 @@ class MemoryRecord(SQLModel, table=True):
     created_by: str = Field(default="user", description="Actor of MemoryCreated (provenance)")
     pinned: bool = Field(default=False, index=True)
     user_weight: float | None = None
+    access_count: int = Field(default=0, description="Folded MemoryAccessed count (signal)")
+    last_accessed_at: datetime | None = None
     archived: bool = Field(default=False, index=True)
     created_at: datetime
     updated_at: datetime

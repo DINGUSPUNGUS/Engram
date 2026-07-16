@@ -40,12 +40,20 @@ conflicts: []
 ​```
 ```
 
-## Running (lands with roadmap phase 8)
+A case may declare fixture state in its Expected YAML under `existing:` — memories
+the harness seeds before evaluating resolution/conflict stages (deterministic ids,
+`uuid5(case, index)`).
 
-- Deterministic stages (chunking, schema validation, conflict rules) run in CI on
-  every PR.
-- LLM-backed stages run locally (or in CI with a pinned local model); scores are only
-  comparable within one provider+model configuration, which the baseline records.
+## Running (live since M5)
+
+- Deterministic stages (chunking, entity resolution, conflict rules) run in CI on
+  every PR: `test_golden_gate.py` executes `deterministic_evaluators()` over
+  `golden/` and enforces `results/baseline.json` via `check_regression`.
+- LLM-backed stages (`evidence_extraction`, `candidate_generation`) have evaluators
+  in `engram_intelligence.evaluators`; run them locally against a configured
+  provider. Scores are only comparable within one provider+model configuration,
+  which the baseline records — they enter the committed baseline the first time a
+  configuration is pinned.
 - The gate: `check_regression(baseline, current)` — regressed stages fail the PR.
   Improvements update `results/baseline.json` **in the same PR**; the baseline diff is
   the review evidence.
