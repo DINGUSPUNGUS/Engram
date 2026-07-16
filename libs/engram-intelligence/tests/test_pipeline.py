@@ -158,7 +158,10 @@ def build(
 def test_prompt_library_ships_loaded_and_versioned() -> None:
     assert PROMPTS.get("evidence-extraction").stage == "evidence_extraction"
     assert PROMPTS.get("candidate-generation").stage == "candidate_generation"
-    assert PROMPTS.get("evidence-extraction").qualified_name == "evidence-extraction@1"
+    # v2 (object-wrapped output for small local models) is the shipped latest;
+    # v1 remains loadable forever (ADR-0013).
+    assert PROMPTS.get("evidence-extraction").qualified_name == "evidence-extraction@2"
+    assert PROMPTS.get("evidence-extraction", version=1).qualified_name == "evidence-extraction@1"
 
 
 @pytest.mark.unit
@@ -413,7 +416,7 @@ def test_identical_runs_produce_identical_intents_and_provenance() -> None:
 
     metadata = json.loads(first_detail)
     assert metadata["pipeline"] == "ingestion/1"
-    assert metadata["prompts"] == ["candidate-generation@1", "evidence-extraction@1"]
+    assert metadata["prompts"] == ["candidate-generation@2", "evidence-extraction@2"]
     assert metadata["counts"]["candidates"] == 2
     assert metadata["configuration"]["provider"] == "fake"
     assert len(metadata["llm_calls"]) == 2  # one extraction chunk + one generation
