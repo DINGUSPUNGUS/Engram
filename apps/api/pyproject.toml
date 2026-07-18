@@ -8,7 +8,7 @@ dependencies = [
     "engram-events",
     "engram-storage-sqlite",
     "engram-export-git",
-    "fastapi>=0.115.0",
+    "fastapi>=0.139.2",
     "uvicorn>=0.34.0",
     "pydantic-settings>=2.7.0",
     "structlog>=24.4.0",
