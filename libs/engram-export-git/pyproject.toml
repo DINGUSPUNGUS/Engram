@@ -6,7 +6,7 @@ requires-python = ">=3.13"
 dependencies = [
     "engram-core",
     "engram-events",
-    "gitpython>=3.1.44",
+    "gitpython>=3.1.58",
     "pyyaml>=6.0.2",
 ]
 

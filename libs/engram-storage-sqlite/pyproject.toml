@@ -7,7 +7,7 @@ dependencies = [
     "engram-core",
     "engram-events",
     "sqlmodel>=0.0.24",
-    "alembic>=1.14.0",
+    "alembic>=1.19.0",
 ]
 
 [tool.uv.sources]
