@@ -43,3 +43,11 @@ Thumbs.db
 
 # Logs
 *.log
+
+# vexp (LSP-free code index) — machine-local daemon state.
+# manifest.json is intentionally tracked (vexp sets merge=union on it);
+# the lock holds a PID and the marker tracks a local daemon, so neither
+# may travel between machines. index.db/vexp.log fall under *.db / *.log.
+.vexp/index.lock
+.vexp/healthy
+.vexp/index.db*
