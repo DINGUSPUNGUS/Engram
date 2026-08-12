@@ -103,6 +103,10 @@ class ProposalQuery(Protocol):
         self, *, status: str | None = None, limit: int = 50
     ) -> Page[ProposalListItem]: ...
 
+    def proposal_timeline(self, proposal_id: ProposalId) -> Sequence[TimelineEntry]:
+        """The proposal's own event history, oldest first (open → review → merge/undo)."""
+        ...
+
 
 class QueryEngine(Protocol):
     """Executes a parsed ``MemoryQuerySpec`` against the projections (ADR-0016).

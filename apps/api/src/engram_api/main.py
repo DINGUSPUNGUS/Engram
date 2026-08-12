@@ -1,6 +1,8 @@
 """App factory. ``uvicorn engram_api.main:app`` for the module-level default;
 tests build isolated instances via :func:`create_app`."""
 
+from threading import Lock
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -32,6 +34,11 @@ def create_app(settings: EngramSettings | None = None) -> FastAPI:
         allow_headers=["*"],
     )
     register_error_handlers(app)
+    # Built on first use, not here: constructing an app must not touch the
+    # filesystem, or exporting the OpenAPI schema would migrate a database.
+    app.state.settings = settings
+    app.state.runtime = None
+    app.state.runtime_lock = Lock()
     app.include_router(system.router)
     app.include_router(v1_router, prefix="/api/v1")
     return app

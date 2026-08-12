@@ -1,5 +1,7 @@
-"""API contract tests for the architecture phase: the shell works end-to-end,
-stubs surface as well-formed 501 problems, never as raw 500s."""
+"""API contract tests: the shell works end-to-end, and endpoints still awaiting
+implementation surface as well-formed 501 problems, never as raw 500s."""
+
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -9,8 +11,14 @@ from engram_api.main import create_app
 
 
 @pytest.fixture
-def client() -> TestClient:
-    app = create_app(EngramSettings(env="test"))
+def client(tmp_path: Path) -> TestClient:
+    """Each app gets its own data directory.
+
+    ``create_app`` now builds a runtime, which migrates a database into
+    ``data_dir`` — defaulting that to ``~/.engram`` would let the suite write to
+    the developer's real space.
+    """
+    app = create_app(EngramSettings(data_dir=tmp_path, env="test"))
     return TestClient(app, raise_server_exceptions=False)
 
 
@@ -35,7 +43,6 @@ def test_version(client: TestClient) -> None:
         ("GET", "/api/v1/memories"),
         ("GET", "/api/v1/search?q=x"),
         ("GET", "/api/v1/events"),
-        ("GET", "/api/v1/proposals"),
         ("POST", "/admin/rebuild"),
     ],
 )

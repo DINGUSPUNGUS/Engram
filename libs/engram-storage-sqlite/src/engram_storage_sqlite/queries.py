@@ -86,24 +86,37 @@ class SqliteMemoryQuery:
         return Page(items=tuple(models), next_cursor=next_cursor)
 
     def timeline(self, memory_id: MemoryId) -> Sequence[TimelineEntry]:
+        return self._stream_timeline(UUID(str(memory_id)), f"no such memory: {memory_id}")
+
+    def proposal_timeline(self, proposal_id: ProposalId) -> Sequence[TimelineEntry]:
+        return self._stream_timeline(UUID(str(proposal_id)), f"no such proposal: {proposal_id}")
+
+    def _stream_timeline(self, stream_id: UUID, missing: str) -> Sequence[TimelineEntry]:
+        """One stream's history, oldest first. Streams are uniform in the log, so
+        memories and proposals differ only in the error message."""
         with self._session() as session:
             rows = session.exec(
                 select(EventRecord)
-                .where(EventRecord.stream_id == str(memory_id))
+                .where(EventRecord.stream_id == str(stream_id))
                 .order_by(col(EventRecord.stream_seq))
             ).all()
         if not rows:
-            raise NotFoundError(f"no such memory: {memory_id}")
-        return tuple(
-            TimelineEntry(
-                event_id=UUID(row.event_id),
-                event_type=row.event_type,
-                occurred_at=from_naive_utc(row.occurred_at),
-                actor=decode_provenance(row.provenance).actor,
-                stream_seq=row.stream_seq,
+            raise NotFoundError(missing)
+        entries = []
+        for row in rows:
+            provenance = decode_provenance(row.provenance)
+            entries.append(
+                TimelineEntry(
+                    event_id=UUID(row.event_id),
+                    event_type=row.event_type,
+                    occurred_at=from_naive_utc(row.occurred_at),
+                    actor=provenance.actor,
+                    stream_seq=row.stream_seq,
+                    session_id=provenance.session_id,
+                    detail=provenance.detail,
+                )
             )
-            for row in rows
-        )
+        return tuple(entries)
 
     # -- helpers ------------------------------------------------------------------
 

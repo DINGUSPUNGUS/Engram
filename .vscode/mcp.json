@@ -4,10 +4,10 @@
       "type": "stdio",
       "command": "node",
       "args": [
-        "c:\\Users\\juden\\.vscode\\extensions\\vexp.vexp-vscode-2.1.6-win32-x64\\dist\\mcp-server.cjs"
+        "c:\\Users\\juden\\.vscode\\extensions\\vexp.vexp-vscode-2.4.0-win32-x64\\dist\\mcp-server.cjs"
       ],
       "env": {
-        "VEXP_WORKSPACE": "d:\\.vscode\\Memory manager"
+        "VEXP_WORKSPACE": "d:\\Dev\\Projects\\Memory manager"
       }
     }
   }

@@ -13,6 +13,20 @@ class Problem(BaseModel):
     instance: str | None = None
 
 
+class ProvenanceView(BaseModel):
+    """Who or what caused an event (ADR-0021 §3).
+
+    ``detail`` is free-form: for pipeline-opened proposals it is the JSON explanation
+    described by ADR-0019 §3 (provider, model ids, prompt versions, scoring inputs);
+    for hand-written events it is absent. Clients parse it defensively and never
+    infer a value it does not contain (ADR-0022 §4).
+    """
+
+    actor: str
+    session_id: str | None = None
+    detail: str | None = None
+
+
 class HealthResponse(BaseModel):
     status: str = "ok"
 

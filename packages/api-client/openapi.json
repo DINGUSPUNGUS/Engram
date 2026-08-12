@@ -665,6 +665,28 @@
         "title": "MemoryResponse",
         "type": "object"
       },
+      "MergeResponse": {
+        "description": "What a merge appended \u2014 the provenance link from proposal to memory events.",
+        "properties": {
+          "appended_event_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Appended Event Ids",
+            "type": "array"
+          },
+          "proposal": {
+            "$ref": "#/components/schemas/ProposalDetailResponse"
+          }
+        },
+        "required": [
+          "proposal",
+          "appended_event_ids"
+        ],
+        "title": "MergeResponse",
+        "type": "object"
+      },
       "OpenProposalRequest": {
         "properties": {
           "description": {
@@ -741,6 +763,76 @@
         "title": "Problem",
         "type": "object"
       },
+      "ProposalDetailResponse": {
+        "description": "One proposal folded from its stream \u2014 the reviewer's view.\n\n``drafts`` are the intents awaiting review; ``merged_event_ids`` are the events a\nmerge actually appended (ADR-0021). Both are read straight off the aggregate: the\ndashboard renders them, it never derives them.",
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "drafts": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Drafts",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "merged_event_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Merged Event Ids",
+            "type": "array"
+          },
+          "review_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Note"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "pending",
+              "approved",
+              "rejected",
+              "merged",
+              "undone"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "description",
+          "status",
+          "version"
+        ],
+        "title": "ProposalDetailResponse",
+        "type": "object"
+      },
       "ProposalListResponse": {
         "properties": {
           "items": {
@@ -769,19 +861,24 @@
         "type": "object"
       },
       "ProposalResponse": {
+        "description": "One row of the review queue.\n\nDeliberately not a truncated detail view: the queue projection knows how many\ndrafts a proposal carries and who opened it, but not the drafts themselves.\nFetch ``/proposals/{id}`` for those rather than inferring them here.",
         "properties": {
           "created_at": {
             "format": "date-time",
             "title": "Created At",
             "type": "string"
           },
-          "description": {
-            "title": "Description",
-            "type": "string"
+          "draft_count": {
+            "title": "Draft Count",
+            "type": "integer"
           },
           "id": {
             "format": "uuid",
             "title": "Id",
+            "type": "string"
+          },
+          "opened_by": {
+            "title": "Opened By",
             "type": "string"
           },
           "review_note": {
@@ -801,7 +898,8 @@
               "pending",
               "approved",
               "rejected",
-              "merged"
+              "merged",
+              "undone"
             ],
             "title": "Status",
             "type": "string"
@@ -819,12 +917,106 @@
         "required": [
           "id",
           "title",
-          "description",
           "status",
+          "draft_count",
+          "opened_by",
           "created_at",
           "updated_at"
         ],
         "title": "ProposalResponse",
+        "type": "object"
+      },
+      "ProposalTimelineEntryResponse": {
+        "description": "One event in a proposal's lifecycle, provenance included.",
+        "properties": {
+          "event_id": {
+            "format": "uuid",
+            "title": "Event Id",
+            "type": "string"
+          },
+          "event_type": {
+            "title": "Event Type",
+            "type": "string"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/ProvenanceView"
+          },
+          "stream_seq": {
+            "title": "Stream Seq",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "event_id",
+          "event_type",
+          "occurred_at",
+          "stream_seq",
+          "provenance"
+        ],
+        "title": "ProposalTimelineEntryResponse",
+        "type": "object"
+      },
+      "ProposalTimelineResponse": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/ProposalTimelineEntryResponse"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "proposal_id": {
+            "format": "uuid",
+            "title": "Proposal Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "proposal_id",
+          "entries"
+        ],
+        "title": "ProposalTimelineResponse",
+        "type": "object"
+      },
+      "ProvenanceView": {
+        "description": "Who or what caused an event (ADR-0021 \u00a73).\n\n``detail`` is free-form: for pipeline-opened proposals it is the JSON explanation\ndescribed by ADR-0019 \u00a73 (provider, model ids, prompt versions, scoring inputs);\nfor hand-written events it is absent. Clients parse it defensively and never\ninfer a value it does not contain (ADR-0022 \u00a74).",
+        "properties": {
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          }
+        },
+        "required": [
+          "actor"
+        ],
+        "title": "ProvenanceView",
         "type": "object"
       },
       "ReviewRequest": {
@@ -1046,6 +1238,28 @@
           "entries"
         ],
         "title": "TimelineResponse",
+        "type": "object"
+      },
+      "UndoResponse": {
+        "description": "What an undo compensated with (ADR-0018 \u00a73: compensation, never erasure).",
+        "properties": {
+          "compensating_event_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Compensating Event Ids",
+            "type": "array"
+          },
+          "proposal": {
+            "$ref": "#/components/schemas/ProposalDetailResponse"
+          }
+        },
+        "required": [
+          "proposal",
+          "compensating_event_ids"
+        ],
+        "title": "UndoResponse",
         "type": "object"
       },
       "UpdateAttributesRequest": {
@@ -2115,6 +2329,36 @@
       "get": {
         "description": "Open and recently closed proposals.",
         "operationId": "list_proposals_api_v1_proposals_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -2170,7 +2414,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ProposalResponse"
+                  "$ref": "#/components/schemas/ProposalDetailResponse"
                 }
               }
             },
@@ -2203,8 +2447,63 @@
         ]
       }
     },
+    "/api/v1/proposals/{proposal_id}": {
+      "get": {
+        "description": "One proposal in full, folded from its stream \u2014 draft intents included.",
+        "operationId": "get_proposal_api_v1_proposals__proposal_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalDetailResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          },
+          "5XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Get Proposal",
+        "tags": [
+          "proposals"
+        ]
+      }
+    },
     "/api/v1/proposals/{proposal_id}/approve": {
       "post": {
+        "description": "Approve an open proposal. Approval does not merge \u2014 two explicit steps.",
         "operationId": "approve_proposal_api_v1_proposals__proposal_id__approve_post",
         "parameters": [
           {
@@ -2233,7 +2532,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ProposalResponse"
+                  "$ref": "#/components/schemas/ProposalDetailResponse"
                 }
               }
             },
@@ -2287,7 +2586,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ProposalResponse"
+                  "$ref": "#/components/schemas/MergeResponse"
                 }
               }
             },
@@ -2322,6 +2621,7 @@
     },
     "/api/v1/proposals/{proposal_id}/reject": {
       "post": {
+        "description": "Reject an open proposal. Its drafts never become events.",
         "operationId": "reject_proposal_api_v1_proposals__proposal_id__reject_post",
         "parameters": [
           {
@@ -2350,7 +2650,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ProposalResponse"
+                  "$ref": "#/components/schemas/ProposalDetailResponse"
                 }
               }
             },
@@ -2378,6 +2678,124 @@
           }
         },
         "summary": "Reject Proposal",
+        "tags": [
+          "proposals"
+        ]
+      }
+    },
+    "/api/v1/proposals/{proposal_id}/timeline": {
+      "get": {
+        "description": "The proposal's lifecycle as events, with the provenance the observatory reads.",
+        "operationId": "proposal_timeline_api_v1_proposals__proposal_id__timeline_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalTimelineResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          },
+          "5XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Proposal Timeline",
+        "tags": [
+          "proposals"
+        ]
+      }
+    },
+    "/api/v1/proposals/{proposal_id}/undo": {
+      "post": {
+        "description": "Compensate a merged proposal (ADR-0018 \u00a73). 409 unless it is merged.",
+        "operationId": "undo_proposal_api_v1_proposals__proposal_id__undo_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UndoResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          },
+          "5XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Undo Proposal",
         "tags": [
           "proposals"
         ]

@@ -146,13 +146,20 @@ class MemorySnapshot:
 
 @dataclass(frozen=True, slots=True)
 class TimelineEntry:
-    """One event of a memory's history, for audit/timeline views."""
+    """One event of a stream's history, for audit/timeline views.
+
+    Carries the envelope's full provenance, not just the actor: ``detail`` is where
+    a pipeline run records provider, model, and prompt versions (ADR-0019 §3), which
+    is what makes the observatory answerable from the log alone (ADR-0022).
+    """
 
     event_id: UUID
     event_type: str
     occurred_at: datetime
     actor: str
     stream_seq: int
+    session_id: str | None = None
+    detail: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

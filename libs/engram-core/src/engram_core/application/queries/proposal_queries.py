@@ -4,7 +4,9 @@ Inspection deliberately folds the proposal's own event stream rather than readin
 projection rows — what a reviewer sees is the history, not a cache of it.
 """
 
-from engram_core.application.dto import Page, ProposalDetail, ProposalListItem
+from collections.abc import Sequence
+
+from engram_core.application.dto import Page, ProposalDetail, ProposalListItem, TimelineEntry
 from engram_core.domain.ports import ProposalQuery, ProposalRepository
 from engram_core.domain.values import ProposalId
 
@@ -21,6 +23,14 @@ class ProposalQueryService:
     ) -> Page[ProposalListItem]:
         """The review queue, newest first."""
         return self._query.list_proposals(status=status, limit=limit)
+
+    def timeline(self, proposal_id: ProposalId) -> Sequence[TimelineEntry]:
+        """The proposal's lifecycle as events: opened, reviewed, merged or undone.
+
+        Raises:
+            NotFoundError: unknown proposal.
+        """
+        return self._query.proposal_timeline(proposal_id)
 
     def get_proposal(self, proposal_id: ProposalId) -> ProposalDetail:
         """One proposal in full, folded from its stream (drafts included).
