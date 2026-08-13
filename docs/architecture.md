@@ -10,6 +10,7 @@ either your change or this document is wrong — fix whichever it is in the same
   abstraction, versioned prompts, and the evaluation gate
 - [Domain model](domain-model.md) · [Events](events.md) · [Data flow](data-flow.md)
 - [REST API](api.md) · [Conventions](conventions.md) · [Operations](operations.md)
+- [Assistant integrations](integrations.md) · [Plugins](plugins.md)
 - [Security](security.md) · [Roadmap](roadmap.md) · [Decisions (ADRs)](adr/)
 
 ## 1. What engram is
@@ -90,7 +91,11 @@ engram/
 │   ├── engram-export-git/      Markdown/NDJSON exporter, git committer, inbound reconciler
 │   ├── engram-intelligence/    AI layer: ingestion pipeline contracts, LLM provider port,
 │   │                           versioned prompts, eval harness (SDKs confined to providers/)
-│   └── engram-observatory/     Explainability: decision traces (the audit graph, ADR-0015)
+│   ├── engram-observatory/     Explainability: decision traces (the audit graph, ADR-0015)
+│   ├── engram-assistants/      Integration layer: AssistantGateway + wire-format adapters
+│   │                           for ChatGPT/Claude/Gemini (ADR-0020)
+│   └── engram-plugins/         Integration layer: PluginGateway + PluginRegistry, capability-
+│                                gated third-party extensions (ADR-0024)
 ├── evaluations/    Golden cases, synthetic corpus spec, committed baseline (ADR-0014)
 ├── docs/           This documentation + ADRs
 ├── docker/         Optional container setup (local-first: not required)
@@ -117,6 +122,10 @@ graph TD
     export --> events
     intel --> events
     api --> events
+    cli -.-> plugins[libs/engram-plugins]
+    plugins --> core
+    assistants[libs/engram-assistants] --> core
+    assistants --> intel
     web[apps/web] --> client[packages/api-client]
     client -. generated from .-> api
 ```
@@ -131,8 +140,11 @@ Everything crosses boundaries through **ports** (`engram_core/domain/ports.py` �
 `MarkdownSync`, `VersionControl`, `Clock`) or the kernel contracts (`EventStore`, `EventBus`,
 `Projection`). Adapters are replaceable per port; the DI composition root in each app
 (`apps/api/src/engram_api/dependencies.py`) is the only place that names implementations.
-This is also the future plugin seam: a plugin is an adapter registered at the composition
-root.
+This is also the plugin seam ([plugins.md](plugins.md), ADR-0024): a *provider* plugin is
+an adapter registered at a composition root exactly like `OllamaProvider` already is; a
+*consumer* plugin instead goes through `engram-plugins`' capability-gated `PluginGateway`,
+which can read (recall-filtered) and open proposals but never approve, merge, or touch a
+port directly.
 
 ## 5. Data flow
 
@@ -254,3 +266,12 @@ An architecture review of this architecture. These are real risks, ranked.
 10. **turbo binary compatibility**: turbo is pinned to exactly 2.5.4 — newer builds crash
     with STATUS_ILLEGAL_INSTRUCTION on CPUs without newer instruction sets. Revisit when
     upstream publishes baseline-CPU builds.
+11. **Plugin isolation is architectural, not adversarial** (ADR-0024 §5). A capability a
+    plugin didn't declare is denied by the gateway, but a plugin willing to `import
+    engram_storage_sqlite` directly in its own code is not stopped by anything at runtime —
+    Python has no in-process capability system. Accepted because it matches the existing
+    single-trust-domain security model (security.md: no auth yet, everything local-user
+    code is one trust domain); a plugin the user installed is exactly as trusted as an
+    `LLMProvider` implementation they configured. Revisit with a dedicated ADR (and likely
+    an out-of-process runtime) only if hostile-plugin isolation ever becomes a real
+    requirement — not preemptively.

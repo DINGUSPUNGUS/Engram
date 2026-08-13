@@ -65,6 +65,7 @@ tables      later)                   │
 | `libs/engram-export-git` | Markdown/NDJSON export projector, git committer, inbound reconciler. |
 | `libs/engram-intelligence` | AI layer: ingestion pipeline contracts, LLM provider port (SDKs confined to `providers/`), versioned prompts, eval harness. |
 | `libs/engram-assistants` | Assistant integration layer: the provider-agnostic gateway + ChatGPT/Claude/Gemini adapters (wire-format translation only, ADR-0020). |
+| `libs/engram-plugins` | Plugin architecture: capability-gated `PluginGateway` + `PluginRegistry` for third-party extensions (read + propose only, ADR-0024). |
 | `libs/engram-observatory` | Explainability: the audit graph answering "why did it do that?" (decision traces, not logs). |
 | `evaluations/` | Golden cases + synthetic corpus spec + the committed quality baseline. |
 | `apps/api` | FastAPI REST server (thin shell over application services). |

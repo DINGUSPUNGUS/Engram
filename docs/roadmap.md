@@ -140,11 +140,30 @@ working navigation, which answers the same question without new client-side fold
 direct memory creation/edit/delete/visibility/lifetime UI (not named by any M7b screen,
 so not built, to avoid scope creep beyond what was asked).
 
-## M8 — Plugins & Ecosystem
+## M8 — Plugins & Ecosystem ✅ (core; ecosystem items remain)
 
-Plugin architecture (adapters registered at composition roots), VSCode extension,
-multi-space and shared/team workspaces, auth (the reserved `get_principal` seam),
-sync daemon owning a space.
+The plugin architecture ([plugins.md](plugins.md), ADR-0024): a new peer layer to
+`engram-assistants`, `engram-plugins`, providing a `PluginRegistry` (register → enable →
+disable → remove; entry-point discovery) and a `PluginGateway` shaped exactly like
+`AssistantGateway` — capability-gated (`declared ∩ supported`), read-only plus one proposal
+door. Eight explicit capabilities across three tiers (read, proposal, provider) and a
+fourth, `MUTATION`, that is declared and permanently empty by construction — no plugin
+capability ever performs a direct write. Approve and merge are not methods a plugin's
+gateway has, at all, so a plugin cannot fast-track its own proposal (proven by tests, not
+just convention). Isolation is stated honestly as architectural, not adversarial — plugins
+run in-process, and a hostile-plugin sandbox is explicitly deferred to its own future ADR
+rather than built speculatively. One reference plugin (`dev.engram.reference-url-evidence`)
+proves the whole path for real: capability → existing `QueryEngine`/evidence read model →
+candidate knowledge → proposal → human review → merge → provenance → replay, wired into the
+CLI (`engram plugins list/run`) alongside the existing review commands.
+**Invariant green**: `libs/engram-plugins/tests/test_replay_without_plugin.py` rebuilds
+projections from a real event log with the reference plugin's module removed from
+`sys.modules`, proving replay never imports or executes plugin code — true across plugin
+removal, upgrade, downgrade, and crash.
+**Deferred (ecosystem, not core)**: VSCode extension, multi-space and shared/team
+workspaces, auth (the reserved `get_principal` seam), sync daemon owning a space, and any
+plugin marketplace/remote registry/sandbox — none were required to prove the extension
+architecture itself.
 
 ## M9 — 1.0
 
