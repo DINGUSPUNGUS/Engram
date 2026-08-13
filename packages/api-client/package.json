@@ -17,6 +17,6 @@
   "devDependencies": {
     "@engram/config-ts": "workspace:*",
     "openapi-typescript": "^7.5.0",
-    "typescript": "^5.7.0"
+    "typescript": "^7.0.2"
   }
 }
