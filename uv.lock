@@ -17,6 +17,7 @@ members = [
     "engram-intelligence",
     "engram-mcp",
     "engram-observatory",
+    "engram-plugins",
     "engram-storage-sqlite",
     "engram-workspace",
 ]
@@ -251,6 +252,7 @@ dependencies = [
     { name = "engram-events" },
     { name = "engram-export-git" },
     { name = "engram-intelligence" },
+    { name = "engram-plugins" },
     { name = "engram-storage-sqlite" },
     { name = "pydantic-settings" },
     { name = "typer" },
@@ -262,6 +264,7 @@ requires-dist = [
     { name = "engram-events", editable = "libs/engram-events" },
     { name = "engram-export-git", editable = "libs/engram-export-git" },
     { name = "engram-intelligence", editable = "libs/engram-intelligence" },
+    { name = "engram-plugins", editable = "libs/engram-plugins" },
     { name = "engram-storage-sqlite", editable = "libs/engram-storage-sqlite" },
     { name = "pydantic-settings", specifier = ">=2.7.0" },
     { name = "typer", specifier = ">=0.15.0" },
@@ -356,6 +359,29 @@ requires-dist = [
     { name = "engram-core", editable = "libs/engram-core" },
     { name = "engram-events", editable = "libs/engram-events" },
 ]
+
+[[package]]
+name = "engram-plugins"
+version = "0.1.0"
+source = { editable = "libs/engram-plugins" }
+dependencies = [
+    { name = "engram-core" },
+    { name = "engram-events" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "engram-storage-sqlite" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "engram-core", editable = "libs/engram-core" },
+    { name = "engram-events", editable = "libs/engram-events" },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "engram-storage-sqlite", editable = "libs/engram-storage-sqlite" }]
 
 [[package]]
 name = "engram-storage-sqlite"

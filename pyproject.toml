@@ -48,6 +48,7 @@ known-first-party = [
     "engram_core",
     "engram_storage_sqlite",
     "engram_export_git",
+    "engram_plugins",
     "engram_api",
     "engram_cli",
     "engram_mcp",
@@ -97,6 +98,7 @@ root_packages = [
     "engram_export_git",
     "engram_intelligence",
     "engram_assistants",
+    "engram_plugins",
     "engram_api",
     "engram_cli",
 ]
@@ -106,7 +108,7 @@ name = "Hexagonal layering (inward-only imports)"
 type = "layers"
 layers = [
     "engram_api | engram_cli",
-    "engram_assistants",  # integration layer: composes adapters for external assistants (ADR-0020)
+    "engram_assistants | engram_plugins",  # integration layer (ADR-0020, ADR-0024): peers, neither depends on the other
     "engram_storage_sqlite | engram_export_git | engram_intelligence",
     "engram_observatory",
     "engram_core",
@@ -129,6 +131,7 @@ source_modules = [
     "engram_intelligence.evaluators",
     "engram_intelligence.provider",
     "engram_assistants",
+    "engram_plugins",
     "engram_api",
     "engram_cli",
 ]
