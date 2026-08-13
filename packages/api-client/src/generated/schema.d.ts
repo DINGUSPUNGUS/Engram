@@ -15,7 +15,10 @@ export interface paths {
         put?: never;
         /**
          * Rebuild Projections
-         * @description Replay the event log through every projection from global_seq 0.
+         * @description Replay the event log through every projection from global_seq 0
+         *     (ADR-0021 §2) — the disposability contract, over HTTP. Synchronous: for a
+         *     local-first single-user space the replay is fast enough that a background
+         *     job would only add a status-polling surface with nothing yet to poll for.
          */
         post: operations["rebuild_projections_admin_rebuild_post"];
         delete?: never;
@@ -45,6 +48,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/events/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Event Stream
+         * @description Live invalidation signals over the event feed (ADR-0023).
+         *
+         *     A message is a signal, not state — it carries the same ``EventResponse``
+         *     shape the paginated feed returns, payloads omitted. Clients react by
+         *     re-reading the affected projection through the normal endpoints; they must
+         *     never fold pushed events into local state (ADR-0021's rule, applied here).
+         *
+         *     Reconnects send ``Last-Event-ID``; the browser's own ``EventSource`` does
+         *     this automatically from the last ``id:`` it saw. One stream per dashboard
+         *     session, shared across views — concurrent streams are capped per process.
+         */
+        get: operations["event_stream_api_v1_events_stream_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/memories": {
         parameters: {
             query?: never;
@@ -54,7 +86,8 @@ export interface paths {
         };
         /**
          * List Memories
-         * @description Cursor-paginated listing. Visibility is enforced against the principal.
+         * @description Cursor-paginated listing. Visibility enforcement against the principal
+         *     arrives with the auth milestone; today every caller is the owning user.
          */
         get: operations["list_memories_api_v1_memories_get"];
         put?: never;
@@ -85,7 +118,8 @@ export interface paths {
         post?: never;
         /**
          * Delete Memory
-         * @description Tombstone the memory (its history remains in the event log).
+         * @description Tombstone the memory (its history remains in the event log). Never called
+         *     by automation (ADR-0011) — there is no proposal-driven path to this route.
          */
         delete: operations["delete_memory_api_v1_memories__memory_id__delete"];
         options?: never;
@@ -95,6 +129,27 @@ export interface paths {
          * @description Sparse narrative edit (title/content/slug). 409 when ``expected_version`` is stale.
          */
         patch: operations["edit_memory_api_v1_memories__memory_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/memories/{memory_id}/at": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Memory At
+         * @description Time travel (ADR-0002/ADR-0021): the memory exactly as it was at a moment
+         *     or version. Exactly one of ``at``/``version`` is required (422 otherwise).
+         */
+        get: operations["memory_at_api_v1_memories__memory_id__at_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/memories/{memory_id}/attributes": {
@@ -226,7 +281,8 @@ export interface paths {
         };
         /**
          * Memory Timeline
-         * @description Full event history of one memory, oldest first.
+         * @description Full event history of one memory, oldest first — provenance included,
+         *     the same shape the Observatory reads (ADR-0021 §3, ADR-0022).
          */
         get: operations["memory_timeline_api_v1_memories__memory_id__timeline_get"];
         put?: never;
@@ -248,7 +304,8 @@ export interface paths {
         put?: never;
         /**
          * Undo Last Change
-         * @description Append the compensating event for the most recent change.
+         * @description Append the compensating event for the most recent change on this memory
+         *     (ADR-0021). 409 when the last event has no defined inverse.
          */
         post: operations["undo_last_change_api_v1_memories__memory_id__undo_post"];
         delete?: never;
@@ -301,6 +358,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/proposals/{proposal_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Proposal
+         * @description One proposal in full, folded from its stream — draft intents included.
+         */
+        get: operations["get_proposal_api_v1_proposals__proposal_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/proposals/{proposal_id}/approve": {
         parameters: {
             query?: never;
@@ -310,7 +387,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Approve Proposal */
+        /**
+         * Approve Proposal
+         * @description Approve an open proposal. Approval does not merge — two explicit steps.
+         */
         post: operations["approve_proposal_api_v1_proposals__proposal_id__approve_post"];
         delete?: never;
         options?: never;
@@ -347,8 +427,51 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Reject Proposal */
+        /**
+         * Reject Proposal
+         * @description Reject an open proposal. Its drafts never become events.
+         */
         post: operations["reject_proposal_api_v1_proposals__proposal_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/proposals/{proposal_id}/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Proposal Timeline
+         * @description The proposal's lifecycle as events, with the provenance the observatory reads.
+         */
+        get: operations["proposal_timeline_api_v1_proposals__proposal_id__timeline_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/proposals/{proposal_id}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo Proposal
+         * @description Compensate a merged proposal (ADR-0018 §3). 409 unless it is merged.
+         */
+        post: operations["undo_proposal_api_v1_proposals__proposal_id__undo_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -367,6 +490,48 @@ export interface paths {
          * @description One language everywhere; FTS is one operator, vectors join it in M5.
          */
         get: operations["search_api_v1_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Settings View
+         * @description Gateway capabilities, export/git status, and export paths — existing
+         *     configuration and ports, read-only; nothing here is mutable yet.
+         */
+        get: operations["settings_view_api_v1_settings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stats
+         * @description Log totals and per-projection drift — what ``engram status`` computes,
+         *     over HTTP. A drifted projection recovers with ``POST /admin/rebuild``.
+         */
+        get: operations["stats_api_v1_stats_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -673,6 +838,64 @@ export interface components {
              */
             visibility: "shared" | "private" | "restricted";
         };
+        /**
+         * MemorySnapshotResponse
+         * @description A memory exactly as it existed at a moment or version (ADR-0021 time travel).
+         *
+         *     Carries no derived scores — those are functions of *now*, which reconstructing
+         *     the past deliberately escapes.
+         */
+        MemorySnapshotResponse: {
+            /** Archived */
+            archived: boolean;
+            /** Attributes */
+            attributes: {
+                [key: string]: unknown;
+            };
+            /** Confidence */
+            confidence: number;
+            /** Content */
+            content: string;
+            /** Deleted */
+            deleted: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "fact" | "preference" | "person" | "organization" | "project" | "skill" | "goal" | "contact" | "event" | "location" | "asset" | "relationship";
+            /**
+             * Lifetime Policy
+             * @enum {string}
+             */
+            lifetime_policy: "permanent" | "standard" | "until" | "ephemeral";
+            /** Slug */
+            slug: string;
+            /** Tags */
+            tags: string[];
+            /** Title */
+            title: string;
+            /** Version */
+            version: number;
+            /**
+             * Visibility
+             * @enum {string}
+             */
+            visibility: "shared" | "private" | "restricted";
+        };
+        /**
+         * MergeResponse
+         * @description What a merge appended — the provenance link from proposal to memory events.
+         */
+        MergeResponse: {
+            /** Appended Event Ids */
+            appended_event_ids: string[];
+            proposal: components["schemas"]["ProposalDetailResponse"];
+        };
         /** OpenProposalRequest */
         OpenProposalRequest: {
             /**
@@ -710,6 +933,52 @@ export interface components {
              */
             type: string;
         };
+        /** ProjectionHealthResponse */
+        ProjectionHealthResponse: {
+            /** Checkpoint */
+            checkpoint: number;
+            /**
+             * Lag
+             * @default 0
+             */
+            lag: number;
+            /** Name */
+            name: string;
+        };
+        /**
+         * ProposalDetailResponse
+         * @description One proposal folded from its stream — the reviewer's view.
+         *
+         *     ``drafts`` are the intents awaiting review; ``merged_event_ids`` are the events a
+         *     merge actually appended (ADR-0021). Both are read straight off the aggregate: the
+         *     dashboard renders them, it never derives them.
+         */
+        ProposalDetailResponse: {
+            /** Description */
+            description: string;
+            /** Drafts */
+            drafts?: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Merged Event Ids */
+            merged_event_ids?: string[];
+            /** Review Note */
+            review_note?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "pending" | "approved" | "rejected" | "merged" | "undone";
+            /** Title */
+            title: string;
+            /** Version */
+            version: number;
+        };
         /** ProposalListResponse */
         ProposalListResponse: {
             /** Items */
@@ -717,27 +986,36 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
-        /** ProposalResponse */
+        /**
+         * ProposalResponse
+         * @description One row of the review queue.
+         *
+         *     Deliberately not a truncated detail view: the queue projection knows how many
+         *     drafts a proposal carries and who opened it, but not the drafts themselves.
+         *     Fetch ``/proposals/{id}`` for those rather than inferring them here.
+         */
         ProposalResponse: {
             /**
              * Created At
              * Format: date-time
              */
             created_at: string;
-            /** Description */
-            description: string;
+            /** Draft Count */
+            draft_count: number;
             /**
              * Id
              * Format: uuid
              */
             id: string;
+            /** Opened By */
+            opened_by: string;
             /** Review Note */
             review_note?: string | null;
             /**
              * Status
              * @enum {string}
              */
-            status: "draft" | "pending" | "approved" | "rejected" | "merged";
+            status: "draft" | "pending" | "approved" | "rejected" | "merged" | "undone";
             /** Title */
             title: string;
             /**
@@ -745,6 +1023,59 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /**
+         * ProposalTimelineEntryResponse
+         * @description One event in a proposal's lifecycle, provenance included.
+         */
+        ProposalTimelineEntryResponse: {
+            /**
+             * Event Id
+             * Format: uuid
+             */
+            event_id: string;
+            /** Event Type */
+            event_type: string;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            provenance: components["schemas"]["ProvenanceView"];
+            /** Stream Seq */
+            stream_seq: number;
+        };
+        /** ProposalTimelineResponse */
+        ProposalTimelineResponse: {
+            /** Entries */
+            entries: components["schemas"]["ProposalTimelineEntryResponse"][];
+            /**
+             * Proposal Id
+             * Format: uuid
+             */
+            proposal_id: string;
+        };
+        /**
+         * ProvenanceView
+         * @description Who or what caused an event (ADR-0021 §3).
+         *
+         *     ``detail`` is free-form: for pipeline-opened proposals it is the JSON explanation
+         *     described by ADR-0019 §3 (provider, model ids, prompt versions, scoring inputs);
+         *     for hand-written events it is absent. Clients parse it defensively and never
+         *     infer a value it does not contain (ADR-0022 §4).
+         */
+        ProvenanceView: {
+            /** Actor */
+            actor: string;
+            /** Detail */
+            detail?: string | null;
+            /** Session Id */
+            session_id?: string | null;
+        };
+        /** RebuildResponse */
+        RebuildResponse: {
+            /** Events Replayed */
+            events_replayed: number;
         };
         /** ReviewRequest */
         ReviewRequest: {
@@ -807,10 +1138,40 @@ export interface components {
              */
             visibility: "shared" | "private" | "restricted";
         };
-        /** TimelineEntryResponse */
+        /** SettingsResponse */
+        SettingsResponse: {
+            /** Assistant Capabilities */
+            assistant_capabilities: string[];
+            /** Data Dir */
+            data_dir: string;
+            /** Db Path */
+            db_path: string;
+            /** Export Paths */
+            export_paths: string[];
+            /** Export Repo Initialized */
+            export_repo_initialized: boolean;
+            /** Export Repo Path */
+            export_repo_path: string;
+        };
+        /** StatsResponse */
+        StatsResponse: {
+            /** Drifted */
+            drifted: boolean;
+            /** Event Count */
+            event_count: number;
+            /** Head Global Seq */
+            head_global_seq: number;
+            /** Memory Count */
+            memory_count: number;
+            /** Projections */
+            projections: components["schemas"]["ProjectionHealthResponse"][];
+        };
+        /**
+         * TimelineEntryResponse
+         * @description One event in a memory's history, provenance included (ADR-0021 §3) —
+         *     what the Observatory reads to answer "where did this come from?" (ADR-0022).
+         */
         TimelineEntryResponse: {
-            /** Actor */
-            actor: string;
             /**
              * Event Id
              * Format: uuid
@@ -823,6 +1184,7 @@ export interface components {
              * Format: date-time
              */
             occurred_at: string;
+            provenance: components["schemas"]["ProvenanceView"];
             /** Stream Seq */
             stream_seq: number;
         };
@@ -853,6 +1215,24 @@ export interface components {
             /** Version */
             version: string;
         };
+        /** UndoResponse */
+        engram_api__schemas__memories__UndoResponse: {
+            /**
+             * Compensating Event Id
+             * Format: uuid
+             */
+            compensating_event_id: string;
+            memory: components["schemas"]["MemoryResponse"];
+        };
+        /**
+         * UndoResponse
+         * @description What an undo compensated with (ADR-0018 §3: compensation, never erasure).
+         */
+        engram_api__schemas__proposals__UndoResponse: {
+            /** Compensating Event Ids */
+            compensating_event_ids: string[];
+            proposal: components["schemas"]["ProposalDetailResponse"];
+        };
     };
     responses: never;
     parameters: never;
@@ -877,9 +1257,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: string;
-                    };
+                    "application/json": components["schemas"]["RebuildResponse"];
                 };
             };
             /** @description Problem details (RFC 9457) */
@@ -922,6 +1300,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EventFeedResponse"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    event_stream_api_v1_events_stream_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Problem details (RFC 9457) */
@@ -1073,7 +1489,9 @@ export interface operations {
     };
     delete_memory_api_v1_memories__memory_id__delete: {
         parameters: {
-            query?: never;
+            query?: {
+                reason?: string | null;
+            };
             header?: never;
             path: {
                 memory_id: string;
@@ -1131,6 +1549,51 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MemoryResponse"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    memory_at_api_v1_memories__memory_id__at_get: {
+        parameters: {
+            query?: {
+                /** @description Instant to reconstruct (ISO-8601) */
+                at?: string | null;
+                /** @description Stream version to reconstruct */
+                version?: number | null;
+            };
+            header?: never;
+            path: {
+                memory_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemorySnapshotResponse"];
                 };
             };
             /** @description Problem details (RFC 9457) */
@@ -1474,7 +1937,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MemoryResponse"];
+                    "application/json": components["schemas"]["engram_api__schemas__memories__UndoResponse"];
                 };
             };
             /** @description Problem details (RFC 9457) */
@@ -1543,7 +2006,10 @@ export interface operations {
     };
     list_proposals_api_v1_proposals_get: {
         parameters: {
-            query?: never;
+            query?: {
+                status?: string | null;
+                limit?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1598,7 +2064,47 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProposalResponse"];
+                    "application/json": components["schemas"]["ProposalDetailResponse"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_proposal_api_v1_proposals__proposal_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalDetailResponse"];
                 };
             };
             /** @description Problem details (RFC 9457) */
@@ -1642,7 +2148,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProposalResponse"];
+                    "application/json": components["schemas"]["ProposalDetailResponse"];
                 };
             };
             /** @description Problem details (RFC 9457) */
@@ -1682,7 +2188,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProposalResponse"];
+                    "application/json": components["schemas"]["MergeResponse"];
                 };
             };
             /** @description Problem details (RFC 9457) */
@@ -1726,7 +2232,91 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProposalResponse"];
+                    "application/json": components["schemas"]["ProposalDetailResponse"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    proposal_timeline_api_v1_proposals__proposal_id__timeline_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalTimelineResponse"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    undo_proposal_api_v1_proposals__proposal_id__undo_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["engram_api__schemas__proposals__UndoResponse"];
                 };
             };
             /** @description Problem details (RFC 9457) */
@@ -1770,6 +2360,82 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SearchResponse"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    settings_view_api_v1_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsResponse"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem details (RFC 9457) */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    stats_api_v1_stats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatsResponse"];
                 };
             };
             /** @description Problem details (RFC 9457) */

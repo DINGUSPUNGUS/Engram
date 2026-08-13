@@ -665,6 +665,112 @@
         "title": "MemoryResponse",
         "type": "object"
       },
+      "MemorySnapshotResponse": {
+        "description": "A memory exactly as it existed at a moment or version (ADR-0021 time travel).\n\nCarries no derived scores \u2014 those are functions of *now*, which reconstructing\nthe past deliberately escapes.",
+        "properties": {
+          "archived": {
+            "title": "Archived",
+            "type": "boolean"
+          },
+          "attributes": {
+            "additionalProperties": true,
+            "title": "Attributes",
+            "type": "object"
+          },
+          "confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "deleted": {
+            "title": "Deleted",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "fact",
+              "preference",
+              "person",
+              "organization",
+              "project",
+              "skill",
+              "goal",
+              "contact",
+              "event",
+              "location",
+              "asset",
+              "relationship"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "lifetime_policy": {
+            "enum": [
+              "permanent",
+              "standard",
+              "until",
+              "ephemeral"
+            ],
+            "title": "Lifetime Policy",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "visibility": {
+            "enum": [
+              "shared",
+              "private",
+              "restricted"
+            ],
+            "title": "Visibility",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "slug",
+          "title",
+          "content",
+          "attributes",
+          "tags",
+          "confidence",
+          "lifetime_policy",
+          "visibility",
+          "archived",
+          "deleted",
+          "version"
+        ],
+        "title": "MemorySnapshotResponse",
+        "type": "object"
+      },
       "MergeResponse": {
         "description": "What a merge appended \u2014 the provenance link from proposal to memory events.",
         "properties": {
@@ -761,6 +867,29 @@
           "status"
         ],
         "title": "Problem",
+        "type": "object"
+      },
+      "ProjectionHealthResponse": {
+        "properties": {
+          "checkpoint": {
+            "title": "Checkpoint",
+            "type": "integer"
+          },
+          "lag": {
+            "default": 0,
+            "title": "Lag",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "checkpoint"
+        ],
+        "title": "ProjectionHealthResponse",
         "type": "object"
       },
       "ProposalDetailResponse": {
@@ -1019,6 +1148,19 @@
         "title": "ProvenanceView",
         "type": "object"
       },
+      "RebuildResponse": {
+        "properties": {
+          "events_replayed": {
+            "title": "Events Replayed",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "events_replayed"
+        ],
+        "title": "RebuildResponse",
+        "type": "object"
+      },
       "ReviewRequest": {
         "properties": {
           "note": {
@@ -1183,12 +1325,89 @@
         "title": "SetVisibilityRequest",
         "type": "object"
       },
-      "TimelineEntryResponse": {
+      "SettingsResponse": {
         "properties": {
-          "actor": {
-            "title": "Actor",
+          "assistant_capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Assistant Capabilities",
+            "type": "array"
+          },
+          "data_dir": {
+            "title": "Data Dir",
             "type": "string"
           },
+          "db_path": {
+            "title": "Db Path",
+            "type": "string"
+          },
+          "export_paths": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Export Paths",
+            "type": "array"
+          },
+          "export_repo_initialized": {
+            "title": "Export Repo Initialized",
+            "type": "boolean"
+          },
+          "export_repo_path": {
+            "title": "Export Repo Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data_dir",
+          "db_path",
+          "export_repo_path",
+          "export_repo_initialized",
+          "export_paths",
+          "assistant_capabilities"
+        ],
+        "title": "SettingsResponse",
+        "type": "object"
+      },
+      "StatsResponse": {
+        "properties": {
+          "drifted": {
+            "title": "Drifted",
+            "type": "boolean"
+          },
+          "event_count": {
+            "title": "Event Count",
+            "type": "integer"
+          },
+          "head_global_seq": {
+            "title": "Head Global Seq",
+            "type": "integer"
+          },
+          "memory_count": {
+            "title": "Memory Count",
+            "type": "integer"
+          },
+          "projections": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectionHealthResponse"
+            },
+            "title": "Projections",
+            "type": "array"
+          }
+        },
+        "required": [
+          "event_count",
+          "head_global_seq",
+          "memory_count",
+          "projections",
+          "drifted"
+        ],
+        "title": "StatsResponse",
+        "type": "object"
+      },
+      "TimelineEntryResponse": {
+        "description": "One event in a memory's history, provenance included (ADR-0021 \u00a73) \u2014\nwhat the Observatory reads to answer \"where did this come from?\" (ADR-0022).",
+        "properties": {
           "event_id": {
             "format": "uuid",
             "title": "Event Id",
@@ -1203,6 +1422,9 @@
             "title": "Occurred At",
             "type": "string"
           },
+          "provenance": {
+            "$ref": "#/components/schemas/ProvenanceView"
+          },
           "stream_seq": {
             "title": "Stream Seq",
             "type": "integer"
@@ -1212,8 +1434,8 @@
           "event_id",
           "event_type",
           "occurred_at",
-          "actor",
-          "stream_seq"
+          "stream_seq",
+          "provenance"
         ],
         "title": "TimelineEntryResponse",
         "type": "object"
@@ -1238,28 +1460,6 @@
           "entries"
         ],
         "title": "TimelineResponse",
-        "type": "object"
-      },
-      "UndoResponse": {
-        "description": "What an undo compensated with (ADR-0018 \u00a73: compensation, never erasure).",
-        "properties": {
-          "compensating_event_ids": {
-            "items": {
-              "format": "uuid",
-              "type": "string"
-            },
-            "title": "Compensating Event Ids",
-            "type": "array"
-          },
-          "proposal": {
-            "$ref": "#/components/schemas/ProposalDetailResponse"
-          }
-        },
-        "required": [
-          "proposal",
-          "compensating_event_ids"
-        ],
-        "title": "UndoResponse",
         "type": "object"
       },
       "UpdateAttributesRequest": {
@@ -1295,6 +1495,46 @@
         ],
         "title": "VersionResponse",
         "type": "object"
+      },
+      "engram_api__schemas__memories__UndoResponse": {
+        "properties": {
+          "compensating_event_id": {
+            "format": "uuid",
+            "title": "Compensating Event Id",
+            "type": "string"
+          },
+          "memory": {
+            "$ref": "#/components/schemas/MemoryResponse"
+          }
+        },
+        "required": [
+          "memory",
+          "compensating_event_id"
+        ],
+        "title": "UndoResponse",
+        "type": "object"
+      },
+      "engram_api__schemas__proposals__UndoResponse": {
+        "description": "What an undo compensated with (ADR-0018 \u00a73: compensation, never erasure).",
+        "properties": {
+          "compensating_event_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Compensating Event Ids",
+            "type": "array"
+          },
+          "proposal": {
+            "$ref": "#/components/schemas/ProposalDetailResponse"
+          }
+        },
+        "required": [
+          "proposal",
+          "compensating_event_ids"
+        ],
+        "title": "UndoResponse",
+        "type": "object"
       }
     }
   },
@@ -1307,18 +1547,14 @@
   "paths": {
     "/admin/rebuild": {
       "post": {
-        "description": "Replay the event log through every projection from global_seq 0.",
+        "description": "Replay the event log through every projection from global_seq 0\n(ADR-0021 \u00a72) \u2014 the disposability contract, over HTTP. Synchronous: for a\nlocal-first single-user space the replay is fast enough that a background\njob would only add a status-polling surface with nothing yet to poll for.",
         "operationId": "rebuild_projections_admin_rebuild_post",
         "responses": {
           "202": {
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "title": "Response Rebuild Projections Admin Rebuild Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/RebuildResponse"
                 }
               }
             },
@@ -1420,9 +1656,49 @@
         ]
       }
     },
+    "/api/v1/events/stream": {
+      "get": {
+        "description": "Live invalidation signals over the event feed (ADR-0023).\n\nA message is a signal, not state \u2014 it carries the same ``EventResponse``\nshape the paginated feed returns, payloads omitted. Clients react by\nre-reading the affected projection through the normal endpoints; they must\nnever fold pushed events into local state (ADR-0021's rule, applied here).\n\nReconnects send ``Last-Event-ID``; the browser's own ``EventSource`` does\nthis automatically from the last ``id:`` it saw. One stream per dashboard\nsession, shared across views \u2014 concurrent streams are capped per process.",
+        "operationId": "event_stream_api_v1_events_stream_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          },
+          "5XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Event Stream",
+        "tags": [
+          "events"
+        ]
+      }
+    },
     "/api/v1/memories": {
       "get": {
-        "description": "Cursor-paginated listing. Visibility is enforced against the principal.",
+        "description": "Cursor-paginated listing. Visibility enforcement against the principal\narrives with the auth milestone; today every caller is the owning user.",
         "operationId": "list_memories_api_v1_memories_get",
         "parameters": [
           {
@@ -1610,7 +1886,7 @@
     },
     "/api/v1/memories/{memory_id}": {
       "delete": {
-        "description": "Tombstone the memory (its history remains in the event log).",
+        "description": "Tombstone the memory (its history remains in the event log). Never called\nby automation (ADR-0011) \u2014 there is no proposal-driven path to this route.",
         "operationId": "delete_memory_api_v1_memories__memory_id__delete",
         "parameters": [
           {
@@ -1621,6 +1897,22 @@
               "format": "uuid",
               "title": "Memory Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "reason",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Reason"
             }
           }
         ],
@@ -1764,6 +2056,98 @@
           }
         },
         "summary": "Edit Memory",
+        "tags": [
+          "memories"
+        ]
+      }
+    },
+    "/api/v1/memories/{memory_id}/at": {
+      "get": {
+        "description": "Time travel (ADR-0002/ADR-0021): the memory exactly as it was at a moment\nor version. Exactly one of ``at``/``version`` is required (422 otherwise).",
+        "operationId": "memory_at_api_v1_memories__memory_id__at_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memory_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Memory Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Instant to reconstruct (ISO-8601)",
+            "in": "query",
+            "name": "at",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Instant to reconstruct (ISO-8601)",
+              "title": "At"
+            }
+          },
+          {
+            "description": "Stream version to reconstruct",
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Stream version to reconstruct",
+              "title": "Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemorySnapshotResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          },
+          "5XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Memory At",
         "tags": [
           "memories"
         ]
@@ -2155,7 +2539,7 @@
     },
     "/api/v1/memories/{memory_id}/timeline": {
       "get": {
-        "description": "Full event history of one memory, oldest first.",
+        "description": "Full event history of one memory, oldest first \u2014 provenance included,\nthe same shape the Observatory reads (ADR-0021 \u00a73, ADR-0022).",
         "operationId": "memory_timeline_api_v1_memories__memory_id__timeline_get",
         "parameters": [
           {
@@ -2209,7 +2593,7 @@
     },
     "/api/v1/memories/{memory_id}/undo": {
       "post": {
-        "description": "Append the compensating event for the most recent change.",
+        "description": "Append the compensating event for the most recent change on this memory\n(ADR-0021). 409 when the last event has no defined inverse.",
         "operationId": "undo_last_change_api_v1_memories__memory_id__undo_post",
         "parameters": [
           {
@@ -2228,7 +2612,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MemoryResponse"
+                  "$ref": "#/components/schemas/engram_api__schemas__memories__UndoResponse"
                 }
               }
             },
@@ -2768,7 +3152,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UndoResponse"
+                  "$ref": "#/components/schemas/engram_api__schemas__proposals__UndoResponse"
                 }
               }
             },
@@ -2882,6 +3266,90 @@
         "summary": "Search",
         "tags": [
           "search"
+        ]
+      }
+    },
+    "/api/v1/settings": {
+      "get": {
+        "description": "Gateway capabilities, export/git status, and export paths \u2014 existing\nconfiguration and ports, read-only; nothing here is mutable yet.",
+        "operationId": "settings_view_api_v1_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          },
+          "5XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Settings View",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/v1/stats": {
+      "get": {
+        "description": "Log totals and per-projection drift \u2014 what ``engram status`` computes,\nover HTTP. A drifted projection recovers with ``POST /admin/rebuild``.",
+        "operationId": "stats_api_v1_stats_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          },
+          "5XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Stats",
+        "tags": [
+          "system"
         ]
       }
     },
