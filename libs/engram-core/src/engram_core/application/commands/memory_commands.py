@@ -8,19 +8,23 @@ The choreography every command follows (ADR-0002):
 4. append via the repository (optimistic concurrency on ``stream_seq``),
 5. publish the appended envelopes on the bus so projections fan out.
 
-M1 implemented the narrative core; spine/link/merge/undo commands land with
-M4 (contracts unchanged).
+M1 implemented the narrative core; M4 added the spine. ``undo_last_change``
+compensates the single most recent event on one stream — the same inverse-event
+table ``ProposalCommandService.undo_proposal`` uses (ADR-0018 §3), applied to one
+stream instead of a proposal's whole merge batch.
 """
 
 from collections.abc import Sequence
+from uuid import UUID
 
+from engram_core.application.commands.compensation import compensate, fold_prefix
 from engram_core.application.dto import (
     CreateMemoryInput,
     EditMemoryInput,
     UpdateAttributesInput,
 )
 from engram_core.domain import scoring
-from engram_core.domain.errors import StaleVersionError
+from engram_core.domain.errors import NotFoundError, StaleVersionError
 from engram_core.domain.kinds import KindRegistry
 from engram_core.domain.memory import Memory
 from engram_core.domain.ports import Clock, MemoryRepository
@@ -35,7 +39,7 @@ from engram_core.domain.values import (
     derive_slug,
     new_memory_id,
 )
-from engram_events import EventBus, EventEnvelope, Provenance, new_uuid7
+from engram_events import EventBus, EventEnvelope, EventStore, Provenance, new_uuid7
 
 _USER_ACTOR = "user"
 
@@ -55,11 +59,13 @@ class MemoryCommandService:
         bus: EventBus,
         clock: Clock,
         kinds: KindRegistry,
+        store: EventStore,
     ) -> None:
         self._repository = repository
         self._bus = bus
         self._clock = clock
         self._kinds = kinds
+        self._store = store
 
     # -- creation & content ---------------------------------------------------
 
@@ -174,9 +180,9 @@ class MemoryCommandService:
         current_version: int,
         payloads: Sequence[object],
         provenance: Provenance,
-    ) -> None:
+    ) -> Sequence[EventEnvelope]:
         if not payloads:
-            return
+            return ()
         occurred_at = self._clock.now()
         envelopes = [
             EventEnvelope(
@@ -193,6 +199,7 @@ class MemoryCommandService:
         ]
         appended = self._repository.append(envelopes)
         self._bus.publish(appended)
+        return appended
 
     # -- later milestones (contracts unchanged) ----------------------------------
 
@@ -301,9 +308,29 @@ class MemoryCommandService:
         merged_content: str,
         provenance: Provenance,
     ) -> None:
-        """Entity resolution merge (M4)."""
+        """Entity resolution merge. Not yet implemented (M5 candidate-generation
+        opens proposals only; a direct merge command has no caller yet)."""
         raise NotImplementedError
 
-    def undo_last_change(self, memory_id: MemoryId, provenance: Provenance) -> None:
-        """Append the compensating event (M4)."""
-        raise NotImplementedError
+    def undo_last_change(self, memory_id: MemoryId, provenance: Provenance) -> UUID:
+        """Compensate the single most recent event on this stream (ADR-0021);
+        returns the compensating event's id.
+
+        Distinct from ``ProposalCommandService.undo_proposal``: that compensates
+        a whole merge batch, this compensates one stream's own last change —
+        the single-memory case ADR-0021 names.
+
+        Raises:
+            NotFoundError: unknown memory.
+            ConflictError: no inverse is defined for the last event type (e.g.
+                the tombstone itself; delete has no compensator today).
+        """
+        envelopes = self._store.read_stream(memory_id)
+        if not envelopes:
+            raise NotFoundError(f"no such memory: {memory_id}")
+        last = envelopes[-1]
+        prior = fold_prefix(envelopes, len(envelopes) - 1, self._kinds)
+        reason = f"undo of {last.event_type} on {memory_id}"
+        payload = compensate(last.payload, prior, reason)
+        appended = self._commit(memory_id, last.stream_seq, (payload,), provenance)
+        return appended[0].event_id

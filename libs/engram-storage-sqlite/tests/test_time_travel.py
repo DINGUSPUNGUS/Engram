@@ -25,7 +25,7 @@ def rig(engine: Engine) -> tuple[MemoryCommandService, HistoryQueryService, Memo
     kinds = build_kind_registry()
     store = SqliteEventStore(engine, build_registry())
     repository = SqliteMemoryRepository(store, kinds)
-    commands = MemoryCommandService(repository, InProcessEventBus(), SystemClock(), kinds)
+    commands = MemoryCommandService(repository, InProcessEventBus(), SystemClock(), kinds, store)
     history = HistoryQueryService(repository)
     memory_id = commands.create_memory(
         CreateMemoryInput(

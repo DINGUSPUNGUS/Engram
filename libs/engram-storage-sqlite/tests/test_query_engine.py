@@ -46,7 +46,7 @@ class _Harness:
 
         bus.subscribe(_project)
         self.repository = SqliteMemoryRepository(self.store, KINDS)
-        self.commands = MemoryCommandService(self.repository, bus, SystemClock(), KINDS)
+        self.commands = MemoryCommandService(self.repository, bus, SystemClock(), KINDS, self.store)
         self.engine_port = SqliteQueryEngine(engine)
 
     def query(

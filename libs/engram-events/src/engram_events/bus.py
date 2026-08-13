@@ -6,6 +6,7 @@ synchronous and in-order: when ``publish`` returns, every projection has seen th
 events. Async/queued buses are a future optimization behind the same protocol.
 """
 
+import contextlib
 from collections.abc import Callable, Sequence
 from typing import Protocol
 
@@ -25,6 +26,11 @@ class EventBus(Protocol):
         """Register a handler that receives every published envelope."""
         ...
 
+    def unsubscribe(self, handler: EventHandler) -> None:
+        """Remove a handler registered via ``subscribe``. A no-op if it is not
+        currently registered (idempotent, so callers need no guard on cleanup)."""
+        ...
+
 
 class InProcessEventBus:
     """Synchronous, in-order, in-process bus. The local-first default."""
@@ -39,3 +45,7 @@ class InProcessEventBus:
 
     def subscribe(self, handler: EventHandler) -> None:
         self._handlers.append(handler)
+
+    def unsubscribe(self, handler: EventHandler) -> None:
+        with contextlib.suppress(ValueError):  # already gone — cleanup is idempotent
+            self._handlers.remove(handler)

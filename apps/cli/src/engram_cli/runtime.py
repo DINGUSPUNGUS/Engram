@@ -96,7 +96,7 @@ def build_runtime(settings: CliSettings) -> Runtime:
         state_projection=state,
         search_projection=search,
         proposals_projection=proposals_projection,
-        commands=MemoryCommandService(repository, bus, clock, kinds),
+        commands=MemoryCommandService(repository, bus, clock, kinds, store),
         proposals=proposals,
         queries=MemoryQueryService(query),
         proposal_queries=ProposalQueryService(proposal_repository, query),

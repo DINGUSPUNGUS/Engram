@@ -51,11 +51,7 @@ CONVERSATION = [
 
 FAKE_RESPONSES = {
     "evidence-extraction": json.dumps(
-        {
-            "evidence": [
-                {"quote": QUOTE, "evidence_type": "quote", "reason": "new person"}
-            ]
-        }
+        {"evidence": [{"quote": QUOTE, "evidence_type": "quote", "reason": "new person"}]}
     ),
     "candidate-generation": json.dumps(
         {
@@ -114,7 +110,7 @@ def build_assistant_space(db_path: Path) -> AssistantSpace:
     proposal_repository = SqliteProposalRepository(store)
     clock = SystemClock()
     query = SqliteQueryEngine(engine)
-    commands = MemoryCommandService(repository, bus, clock, kinds)
+    commands = MemoryCommandService(repository, bus, clock, kinds, store)
     proposals = ProposalCommandService(proposal_repository, repository, bus, clock, kinds, store)
 
     trace = PipelineTrace()

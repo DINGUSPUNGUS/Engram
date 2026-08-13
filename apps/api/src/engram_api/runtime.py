@@ -121,7 +121,7 @@ def build_runtime(settings: EngramSettings) -> Runtime:
         state_projection=state,
         search_projection=search_projection,
         proposals_projection=proposals_projection,
-        commands=MemoryCommandService(repository, bus, clock, kinds),
+        commands=MemoryCommandService(repository, bus, clock, kinds, store),
         proposals=ProposalCommandService(proposal_repository, repository, bus, clock, kinds, store),
         queries=MemoryQueryService(query),
         proposal_queries=ProposalQueryService(proposal_repository, query),

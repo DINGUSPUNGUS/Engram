@@ -86,7 +86,7 @@ def build_space(db_path: Path) -> Space:
     return Space(
         engine=engine,
         store=store,
-        commands=MemoryCommandService(repository, bus, clock, kinds),
+        commands=MemoryCommandService(repository, bus, clock, kinds, store),
         proposals=proposals,
         query=query,
         exporter=ExportEngine(query, store, engine_version="test"),
