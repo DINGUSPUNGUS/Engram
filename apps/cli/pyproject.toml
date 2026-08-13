@@ -9,6 +9,7 @@ dependencies = [
     "engram-storage-sqlite",
     "engram-export-git",
     "engram-intelligence",
+    "engram-plugins",
     "typer>=0.15.0",
     "pydantic-settings>=2.7.0",
 ]
@@ -22,6 +23,7 @@ engram-events = { workspace = true }
 engram-storage-sqlite = { workspace = true }
 engram-export-git = { workspace = true }
 engram-intelligence = { workspace = true }
+engram-plugins = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

@@ -750,6 +750,64 @@ def git_commit(
     _run(action)
 
 
+plugins_app = typer.Typer(
+    name="plugins",
+    help="Capability-gated extensions: read + propose only, never merge (ADR-0024).",
+    no_args_is_help=True,
+)
+app.add_typer(plugins_app)
+
+
+@plugins_app.command(name="list")
+def plugins_list() -> None:
+    """Installed plugins, their lifecycle status, and granted capabilities."""
+    from engram_cli.plugins import build_plugin_registry
+
+    def action() -> None:
+        registry = build_plugin_registry()
+        for record in registry.list():
+            capabilities = ",".join(sorted(c.value for c in record.descriptor.capabilities))
+            typer.echo(
+                f"{record.descriptor.qualified_name:<45} {record.status.value:<10} {capabilities}"
+            )
+
+    _run(action)
+
+
+@plugins_app.command(name="run")
+def plugins_run(
+    plugin_id: Annotated[str, typer.Argument(help="e.g. dev.engram.reference-url-evidence")],
+) -> None:
+    """Run one enabled plugin. It can only read (capability-gated) and open ONE
+    proposal — never write memory directly. Review with `engram proposals show`,
+    then approve + merge, exactly like any other proposal."""
+    from engram_cli.plugins import build_plugin_gateway, build_plugin_registry
+    from engram_plugins.contract import PluginContext
+
+    def action() -> None:
+        runtime = _runtime()
+        registry = build_plugin_registry()
+        gateway = build_plugin_gateway(runtime)
+        result = registry.run(plugin_id, gateway, PluginContext(source="cli:plugins run"))
+        if not result.ok:
+            typer.secho(f"plugin failed: {result.note} ({result.error})", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+        if result.proposal_id is None:
+            typer.echo(result.note)
+            return
+        typer.secho(
+            f"opened proposal {result.proposal_id}: {result.candidate_count} draft(s)",
+            fg=typer.colors.GREEN,
+        )
+        typer.echo(
+            f"review it: engram proposals show {result.proposal_id}"
+            f" && engram proposals approve {result.proposal_id}"
+            f" && engram proposals merge {result.proposal_id}"
+        )
+
+    _run(action)
+
+
 def _runtime() -> Runtime:
     return build_runtime(CliSettings())
 
