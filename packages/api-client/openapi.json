@@ -1393,12 +1393,17 @@
             },
             "title": "Projections",
             "type": "array"
+          },
+          "proposal_count": {
+            "title": "Proposal Count",
+            "type": "integer"
           }
         },
         "required": [
           "event_count",
           "head_global_seq",
           "memory_count",
+          "proposal_count",
           "projections",
           "drifted"
         ],

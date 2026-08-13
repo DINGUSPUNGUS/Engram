@@ -3,6 +3,7 @@
 ones: the same rebuild count ``engram rebuild`` reports, the same drift check
 ``engram status`` reports."""
 
+import uuid
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -11,8 +12,30 @@ from fastapi.testclient import TestClient
 
 from engram_api.config import EngramSettings
 from engram_api.main import create_app
+from engram_core.application.commands.drafts import CreateMemoryDraft, to_dict
 
 ACTOR_HEADERS = {"X-Engram-Actor": "claude"}
+
+
+def _draft() -> dict[str, object]:
+    """A well-formed create intent — the same shape test_proposal_review_api.py
+    uses — so opening a proposal here appends a real ProposalOpened event."""
+    return to_dict(
+        CreateMemoryDraft(
+            memory_id=uuid.uuid4(),
+            kind="preference",
+            slug="prefers-dark-mode",
+            title="Prefers dark mode",
+            content="",
+            attributes={"polarity": "likes", "strength": 0.5, "context": "UI"},
+            attributes_schema_version=1,
+            tags=(),
+            confidence=0.8,
+            lifetime_policy="permanent",
+            lifetime_until=None,
+            visibility="private",
+        )
+    )
 
 
 @pytest.fixture
@@ -27,6 +50,7 @@ def test_stats_reflects_writes(client: TestClient) -> None:
     empty = client.get("/api/v1/stats").json()
     assert empty["event_count"] == 0
     assert empty["memory_count"] == 0
+    assert empty["proposal_count"] == 0
     assert empty["drifted"] is False
 
     client.post(
@@ -37,11 +61,17 @@ def test_stats_reflects_writes(client: TestClient) -> None:
             "attributes": {"statement": "x"},
         },
     )
+    opened = client.post(
+        "/api/v1/proposals",
+        json={"title": "a draft proposal", "proposed_events": [_draft()]},
+    )
+    assert opened.status_code == 201, opened.text
 
     after = client.get("/api/v1/stats").json()
-    assert after["event_count"] == 1
+    assert after["event_count"] == 2  # MemoryCreated + ProposalOpened
     assert after["memory_count"] == 1
-    assert after["head_global_seq"] == 1
+    assert after["proposal_count"] == 1
+    assert after["head_global_seq"] == 2
     assert {p["name"] for p in after["projections"]} >= {"state", "search"}
 
 

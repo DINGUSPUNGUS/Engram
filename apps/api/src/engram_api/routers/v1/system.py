@@ -29,6 +29,7 @@ async def stats(runtime: RuntimeDep) -> StatsResponse:
         event_count=space.event_count,
         head_global_seq=space.head_global_seq,
         memory_count=space.memory_count,
+        proposal_count=space.proposal_count,
         projections=[
             ProjectionHealthResponse(name=p.name, checkpoint=p.checkpoint, lag=p.lag)
             for p in space.projections

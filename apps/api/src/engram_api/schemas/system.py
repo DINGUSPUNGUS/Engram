@@ -26,6 +26,7 @@ class StatsResponse(BaseModel):
     event_count: int
     head_global_seq: int
     memory_count: int
+    proposal_count: int
     projections: list[ProjectionHealthResponse]
     drifted: bool
 

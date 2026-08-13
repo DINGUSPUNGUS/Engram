@@ -1165,6 +1165,8 @@ export interface components {
             memory_count: number;
             /** Projections */
             projections: components["schemas"]["ProjectionHealthResponse"][];
+            /** Proposal Count */
+            proposal_count: number;
         };
         /**
          * TimelineEntryResponse

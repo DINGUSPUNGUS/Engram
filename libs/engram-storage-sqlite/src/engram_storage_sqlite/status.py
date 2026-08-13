@@ -15,7 +15,7 @@ from sqlmodel import Session, select
 
 from engram_core.domain.errors import StorageError
 from engram_events import Projection
-from engram_storage_sqlite.models import EventRecord, MemoryRecord
+from engram_storage_sqlite.models import EventRecord, MemoryRecord, ProposalRecord
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,6 +30,7 @@ class SpaceStatus:
     event_count: int
     head_global_seq: int
     memory_count: int
+    proposal_count: int
     projections: tuple[ProjectionHealth, ...]
 
     @property
@@ -44,12 +45,14 @@ def space_status(engine: Engine, projections: Sequence[Projection]) -> SpaceStat
             head = session.exec(select(func.max(EventRecord.global_seq))).one() or 0
             event_count = session.exec(select(func.count()).select_from(EventRecord)).one()
             memory_count = session.exec(select(func.count()).select_from(MemoryRecord)).one()
+            proposal_count = session.exec(select(func.count()).select_from(ProposalRecord)).one()
     except SQLAlchemyError as exc:
         raise StorageError(f"status read failed: {exc}") from exc
     return SpaceStatus(
         event_count=int(event_count),
         head_global_seq=int(head),
         memory_count=int(memory_count),
+        proposal_count=int(proposal_count),
         projections=tuple(
             ProjectionHealth(
                 name=projection.name,
