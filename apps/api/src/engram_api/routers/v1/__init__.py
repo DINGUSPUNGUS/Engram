@@ -2,10 +2,11 @@
 
 from fastapi import APIRouter
 
-from engram_api.routers.v1 import events, memories, proposals, search
+from engram_api.routers.v1 import events, memories, proposals, search, system
 
 router = APIRouter()
 router.include_router(memories.router)
 router.include_router(proposals.router)
 router.include_router(search.router)
 router.include_router(events.router)
+router.include_router(system.router)

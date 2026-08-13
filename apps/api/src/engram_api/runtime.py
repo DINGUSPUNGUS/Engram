@@ -26,6 +26,7 @@ from engram_core.domain.events import build_registry
 from engram_core.domain.kinds import build_kind_registry
 from engram_events import EventEnvelope, EventRegistry, InProcessEventBus, SystemClock
 from engram_export_git.exporter import ExportEngine
+from engram_export_git.reconciler import GitReconciler
 from engram_export_git.repo import GitVersionControl
 from engram_storage_sqlite.event_store import SqliteEventStore, create_sqlite_engine
 from engram_storage_sqlite.maintenance import rebuild_projections
@@ -63,6 +64,7 @@ class Runtime:
     timeline: TimelineQueryService
     history: HistoryQueryService
     exporter: ExportEngine
+    reconciler: GitReconciler
     git: GitVersionControl
 
     def rebuild(self) -> int:
@@ -129,5 +131,6 @@ def build_runtime(settings: EngramSettings) -> Runtime:
         timeline=TimelineQueryService(query),
         history=HistoryQueryService(repository),
         exporter=ExportEngine(query, store, engine_version=__version__),
+        reconciler=GitReconciler(settings.resolved_export_repo, registry),
         git=GitVersionControl(settings.resolved_export_repo),
     )

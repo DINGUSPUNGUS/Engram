@@ -22,7 +22,7 @@ from engram_core.application.queries.search_queries import SearchQueryService
 from engram_core.application.queries.timeline_queries import TimelineQueryService
 from engram_core.domain.events import build_registry
 from engram_core.domain.kinds import KindRegistry, build_kind_registry
-from engram_events import EventRegistry, Provenance
+from engram_events import EventBus, EventRegistry, EventStore, Provenance
 
 
 @lru_cache(maxsize=1)
@@ -97,3 +97,16 @@ def get_timeline_queries(runtime: RuntimeDep) -> TimelineQueryService:
 
 def get_history_queries(runtime: RuntimeDep) -> HistoryQueryService:
     return runtime.history
+
+
+def get_event_store(runtime: RuntimeDep) -> EventStore:
+    """The raw log, for the audit feed and SSE (ADR-0021 §2, ADR-0023) — both
+    read events, not projections, so they read the store directly rather than
+    through a query service that would have nothing to add."""
+    return runtime.store
+
+
+def get_event_bus(runtime: RuntimeDep) -> EventBus:
+    """Wakeup signal for the SSE stream (ADR-0023 §4): the bus says *when* to
+    look, the store says *what is true*."""
+    return runtime.bus
