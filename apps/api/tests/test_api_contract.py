@@ -1,5 +1,8 @@
-"""API contract tests: the shell works end-to-end, and endpoints still awaiting
-implementation surface as well-formed 501 problems, never as raw 500s."""
+"""API contract tests: the shell works end-to-end. M7a closed the last
+architecture-phase stub (``apps/api/src/engram_api`` has no remaining
+``NotImplementedError``); ``errors.py`` still maps one to a well-formed 501
+problem for whatever the next milestone adds, and that mapping is unit-tested
+in isolation rather than against a router that no longer stubs anything."""
 
 from pathlib import Path
 
@@ -37,17 +40,24 @@ def test_version(client: TestClient) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize(
-    "method,path",
-    [
-        ("GET", "/api/v1/memories"),
-        ("GET", "/api/v1/search?q=x"),
-        ("GET", "/api/v1/events"),
-        ("POST", "/admin/rebuild"),
-    ],
-)
-def test_stub_endpoints_return_problem_501(client: TestClient, method: str, path: str) -> None:
-    response = client.request(method, path)
+def test_not_implemented_still_surfaces_as_problem_501() -> None:
+    """The mapping itself, isolated from any specific route (M7a left none
+    stubbed): a future ``NotImplementedError`` is a well-formed problem, never
+    a raw 500."""
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient as _TestClient
+
+    from engram_api.errors import register_error_handlers
+
+    app = FastAPI()
+    register_error_handlers(app)
+
+    @app.get("/not-yet")
+    async def _not_yet() -> None:
+        raise NotImplementedError
+
+    response = _TestClient(app, raise_server_exceptions=False).get("/not-yet")
+
     assert response.status_code == 501
     assert response.headers["content-type"].startswith("application/problem+json")
     body = response.json()

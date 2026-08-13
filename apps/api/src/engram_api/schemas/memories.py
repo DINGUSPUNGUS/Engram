@@ -6,6 +6,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from engram_api.schemas.common import ProvenanceView
+
 MemoryKindName = Literal[
     "fact",
     "preference",
@@ -149,13 +151,43 @@ class SetLifetimeRequest(BaseModel):
 
 
 class TimelineEntryResponse(BaseModel):
+    """One event in a memory's history, provenance included (ADR-0021 §3) —
+    what the Observatory reads to answer "where did this come from?" (ADR-0022)."""
+
     event_id: UUID
     event_type: str
     occurred_at: datetime
-    actor: str
     stream_seq: int
+    provenance: ProvenanceView
 
 
 class TimelineResponse(BaseModel):
     memory_id: UUID
     entries: list[TimelineEntryResponse]
+
+
+class MemorySnapshotResponse(BaseModel):
+    """A memory exactly as it existed at a moment or version (ADR-0021 time travel).
+
+    Carries no derived scores — those are functions of *now*, which reconstructing
+    the past deliberately escapes.
+    """
+
+    id: UUID
+    kind: MemoryKindName
+    slug: str
+    title: str
+    content: str
+    attributes: dict[str, object]
+    tags: list[str]
+    confidence: float = Field(ge=0, le=1)
+    lifetime_policy: LifetimePolicyName
+    visibility: VisibilityName
+    archived: bool
+    deleted: bool
+    version: int
+
+
+class UndoResponse(BaseModel):
+    memory: MemoryResponse
+    compensating_event_id: UUID

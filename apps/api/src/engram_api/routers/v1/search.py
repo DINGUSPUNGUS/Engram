@@ -1,4 +1,4 @@
-"""/search — the query language (ADR-0016) over HTTP. Stub until M7.
+"""/search — the query language (ADR-0016) over HTTP.
 
 ``q`` accepts the full language: ``kind:project status:active tag:oss
 confidence>0.8 dark mode``. There are no separate filter params — filters are
@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, Query
 
 from engram_api.dependencies import get_search_queries
 from engram_api.schemas.common import PROBLEM_RESPONSES
-from engram_api.schemas.search import SearchResponse
+from engram_api.schemas.search import SearchHitResponse, SearchResponse
 from engram_core.application.queries.search_queries import SearchQueryService
 
 router = APIRouter(prefix="/search", tags=["search"], responses=PROBLEM_RESPONSES)
@@ -25,4 +25,20 @@ async def search(
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> SearchResponse:
     """One language everywhere; FTS is one operator, vectors join it in M5."""
-    raise NotImplementedError
+    page = queries.query(q, cursor=cursor, limit=limit)
+    return SearchResponse(
+        query=q,
+        hits=[
+            SearchHitResponse(
+                memory_id=hit.memory.id,
+                kind=hit.memory.kind.value,
+                slug=hit.memory.slug,
+                title=hit.memory.title,
+                snippet=hit.snippet,
+                score=hit.score,
+                effective_confidence=hit.memory.effective_confidence,
+            )
+            for hit in page.items
+        ],
+        next_cursor=page.next_cursor,
+    )
