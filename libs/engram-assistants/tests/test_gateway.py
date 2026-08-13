@@ -82,9 +82,7 @@ def test_the_recall_boundary_enforces_visibility(space: AssistantSpace) -> None:
     with pytest.raises(NotFoundError) as hidden:
         space.gateway.recall_memory(ids["private"], descriptor=CHATGPT, context=CONTEXT)
     with pytest.raises(NotFoundError) as absent:
-        space.gateway.recall_memory(
-            MemoryId(uuid.uuid4()), descriptor=CHATGPT, context=CONTEXT
-        )
+        space.gateway.recall_memory(MemoryId(uuid.uuid4()), descriptor=CHATGPT, context=CONTEXT)
     assert str(hidden.value).split(":")[0] == str(absent.value).split(":")[0]
 
     with pytest.raises(NotFoundError):
