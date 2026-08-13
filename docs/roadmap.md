@@ -116,11 +116,29 @@ Remaining in M6 scope: the MCP stdio transport (a thin shell over this gateway)
 and `engram_forget` (needs an archive intent — an ADR-worthy proposal-workflow
 addition, deliberately not smuggled in).
 
-## M7 — Web Dashboard
+## M7 — Web Dashboard ✅
 
-REST completeness (all v1 endpoints live, timeline/undo over HTTP) and the dashboard:
-list/query/show memories, timelines, proposal review UI, graph visualization.
-Invariant: OpenAPI drift check green; dashboard consumes only `@engram/api-client`.
+REST completeness (all v1 endpoints live, timeline/undo over HTTP, ADR-0021/0023) and
+the dashboard: Home, Memory Explorer, Proposal Review, Timeline, Observatory, Console,
+Settings — seven thin screens over `@engram/api-client`, none with domain logic of its
+own (ADR-0007 applied to React). Approve and merge are two separate, differently-styled
+actions that cannot be reached from the same control (ADR-0018 §2 made visible). Live
+updates are SSE invalidation signals only, followed by a normal refetch through the same
+endpoints every other view uses (ADR-0023) — the browser's own `EventSource` handles
+reconnect via `Last-Event-ID`, so the dashboard has no reconnection logic of its own.
+The Observatory reconstructs explanations from evented facts (ADR-0022) and says so
+plainly when it can't answer, including a genuine, named gap: the log has no index from
+a memory's event back to the proposal that produced it, so that lookup is a small,
+bounded, user-triggered search over recent merges rather than a silent guess.
+**Invariant green**: OpenAPI drift check green (`proposal_count` added to `/stats`,
+additive only); the dashboard imports nothing from the backend except
+`@engram/api-client`; 33 frontend tests (MSW-backed) cover every required scenario plus
+a full assistant-proposal → review → merge → undo → rebuild workflow through the real
+page components.
+**Deferred**: a rendered relationship graph (Memory Explorer lists links as text with
+working navigation, which answers the same question without new client-side folding);
+direct memory creation/edit/delete/visibility/lifetime UI (not named by any M7b screen,
+so not built, to avoid scope creep beyond what was asked).
 
 ## M8 — Plugins & Ecosystem
 
