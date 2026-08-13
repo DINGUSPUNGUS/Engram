@@ -26,4 +26,4 @@ export function createEngramClient(options: EngramClientOptions = {}) {
 }
 
 export type EngramClient = ReturnType<typeof createEngramClient>;
-export type { paths } from "./generated/schema";
+export type { components, paths } from "./generated/schema";
