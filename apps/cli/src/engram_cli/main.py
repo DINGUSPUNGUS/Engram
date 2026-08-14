@@ -757,13 +757,32 @@ plugins_app = typer.Typer(
 )
 app.add_typer(plugins_app)
 
+_PLUGINS_PACKAGE = "engram_plugins"
+_PLUGINS_UNAVAILABLE = (
+    "plugin support is unavailable: the 'engram-plugins' package is not installed"
+    " — install it to use `engram plugins`"
+)
+
+
+def _is_missing_plugins_package(exc: ModuleNotFoundError) -> bool:
+    """True only for an import failure of ``engram_plugins`` itself (or one of
+    its submodules) — never for an unrelated missing dependency that happens
+    to surface while importing it."""
+    name = exc.name or ""
+    return name == _PLUGINS_PACKAGE or name.startswith(f"{_PLUGINS_PACKAGE}.")
+
 
 @plugins_app.command(name="list")
 def plugins_list() -> None:
     """Installed plugins, their lifecycle status, and granted capabilities."""
-    from engram_cli.plugins import build_plugin_registry
 
     def action() -> None:
+        try:
+            from engram_cli.plugins import build_plugin_registry
+        except ModuleNotFoundError as exc:
+            if not _is_missing_plugins_package(exc):
+                raise
+            raise EngramError(_PLUGINS_UNAVAILABLE) from exc
         registry = build_plugin_registry()
         for record in registry.list():
             capabilities = ",".join(sorted(c.value for c in record.descriptor.capabilities))
@@ -781,10 +800,15 @@ def plugins_run(
     """Run one enabled plugin. It can only read (capability-gated) and open ONE
     proposal — never write memory directly. Review with `engram proposals show`,
     then approve + merge, exactly like any other proposal."""
-    from engram_cli.plugins import build_plugin_gateway, build_plugin_registry
-    from engram_plugins.contract import PluginContext
 
     def action() -> None:
+        try:
+            from engram_cli.plugins import build_plugin_gateway, build_plugin_registry
+            from engram_plugins.contract import PluginContext
+        except ModuleNotFoundError as exc:
+            if not _is_missing_plugins_package(exc):
+                raise
+            raise EngramError(_PLUGINS_UNAVAILABLE) from exc
         runtime = _runtime()
         registry = build_plugin_registry()
         gateway = build_plugin_gateway(runtime)
