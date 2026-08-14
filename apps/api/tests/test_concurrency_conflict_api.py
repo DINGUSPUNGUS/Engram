@@ -11,6 +11,7 @@ the only one on the log, and projections agree with the log afterward.
 
 from collections.abc import Iterator
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
 import pytest
 from fastapi.testclient import TestClient
@@ -19,6 +20,9 @@ from engram_api.config import EngramSettings
 from engram_api.main import create_app
 from engram_core.domain.values import MemoryId
 from engram_events import EventEnvelope, Provenance, new_uuid7
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
 
 ACTOR_HEADERS = {"X-Engram-Actor": "claude", "X-Engram-Session": "sess-1"}
 
@@ -61,7 +65,7 @@ def test_concurrent_write_conflict_returns_409_problem_json(
     memory_id = created.json()["id"]
     stream_id = MemoryId(memory_id)
 
-    runtime = client.app.state.runtime  # populated by the request above
+    runtime = cast("FastAPI", client.app).state.runtime  # populated by the request above
     repository = runtime.commands._repository
     real_append = repository.append
     armed = {"value": True}

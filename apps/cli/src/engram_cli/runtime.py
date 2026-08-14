@@ -25,6 +25,7 @@ from engram_storage_sqlite.maintenance import (
     rebuild_projections,
     verify_projection_fidelity,
 )
+from engram_storage_sqlite.migrate import require_current_schema
 from engram_storage_sqlite.projections.proposals import ProposalProjection
 from engram_storage_sqlite.projections.search import SearchProjection
 from engram_storage_sqlite.projections.state import StateProjection
@@ -77,6 +78,13 @@ def build_runtime(settings: CliSettings) -> Runtime:
     if not db_path.exists():
         raise NotFoundError(f"no engram database at {db_path} — run `engram init` first")
     engine = create_sqlite_engine(f"sqlite:///{db_path}")
+    # The CLI deliberately never auto-migrates on every invocation (unlike the
+    # API — see engram_api.runtime's own comment on that difference): opening
+    # a space this build's schema has moved past is a real, common upgrade
+    # scenario (a newer `engram` binary against an older ~/.engram), so it
+    # must fail with guidance to run `engram init`, not run writes against a
+    # schema missing columns this build's models assume (ADR-0026).
+    require_current_schema(db_path, engine)
     registry = build_registry()
     kinds = build_kind_registry()
     store = SqliteEventStore(engine, registry)
