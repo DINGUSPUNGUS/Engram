@@ -1,0 +1,11 @@
+{
+  "_meta": {
+    "description": "Content fingerprints (sha256) of every shipped prompt version (ADR-0013). A mismatch means a shipped version file changed without a version bump -- revert the edit, or bump the version and regenerate this file in the same change. Checked by test_prompt_library_integrity.py."
+  },
+  "fingerprints": {
+    "candidate-generation@1": "9b6e3f7ead30028552b680ec5e92bdce63ce33c99bd57dc6da695c8effe29181",
+    "candidate-generation@2": "7332e0e81cf87ac185140f5533eff0ae69bf6c9006d488cef24778e1b542a6af",
+    "evidence-extraction@1": "1d0f6558e62ed1539c25f605df61d13aa39602c032cbfa543249af2254793edc",
+    "evidence-extraction@2": "daefc9ea1e1b3f6f4f42bcc75c94757ffbb7162a0f68f0cf3ae9c70d07eaf109"
+  }
+}

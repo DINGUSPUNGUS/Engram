@@ -5,6 +5,8 @@ a change is a new version file in ``library/``; old versions remain because past
 proposals reference them (``prompt_name@version`` in proposal metadata).
 """
 
+import hashlib
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -13,6 +15,7 @@ import yaml
 from engram_core.domain.errors import ValidationError
 
 _LIBRARY_DIR = Path(__file__).parent / "library"
+_LOCK_PATH = Path(__file__).parent / "library.lock.json"
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,6 +45,32 @@ class PromptTemplate:
     def qualified_name(self) -> str:
         """The audit-trail identifier stamped into proposal metadata."""
         return f"{self.name}@{self.version}"
+
+    @property
+    def fingerprint(self) -> str:
+        """Content hash of everything that defines this version's behavior.
+
+        ADR-0013 says a shipped version is immutable and a change is a new
+        version file — this is what actually catches a violation: the registry
+        alone only rejects a *duplicate* (name, version) key, so an in-place
+        edit that keeps the version number silently changes what
+        ``prompt_name@version`` in a proposal's provenance meant, with nothing
+        to notice (the P1 gap the fingerprint closes). Not the raw file bytes:
+        frontmatter key order or incidental whitespace outside the body
+        doesn't change behavior and shouldn't false-positive.
+        """
+        canonical = "\x1f".join(
+            (
+                self.name,
+                str(self.version),
+                self.author,
+                self.stage,
+                self.body,
+                self.expected_output,
+                "\x1e".join(self.model_hints),
+            )
+        )
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 class PromptRegistry:
@@ -76,6 +105,10 @@ class PromptRegistry:
         """All registered versions of a prompt, ascending."""
         return tuple(sorted(v for (n, v) in self._templates if n == name))
 
+    def all(self) -> tuple[PromptTemplate, ...]:
+        """Every registered template, ordered by (name, version)."""
+        return tuple(self._templates[key] for key in sorted(self._templates))
+
 
 def load_library(directory: Path | None = None) -> PromptRegistry:
     """Load every ``*.md`` prompt file (YAML frontmatter + body) into a registry.
@@ -90,6 +123,46 @@ def load_library(directory: Path | None = None) -> PromptRegistry:
     for path in sorted((directory or _LIBRARY_DIR).glob("*.md")):
         registry.register(_parse_prompt_file(path))
     return registry
+
+
+def library_fingerprints(registry: PromptRegistry) -> dict[str, str]:
+    """``{qualified_name: fingerprint}`` for every template in ``registry`` —
+    the shape ``library.lock.json`` commits and ``verify_library_lock`` checks
+    against."""
+    return {template.qualified_name: template.fingerprint for template in registry.all()}
+
+
+def verify_library_lock(
+    registry: PromptRegistry | None = None, lock_path: Path | None = None
+) -> tuple[str, ...]:
+    """Compare the library's actual content fingerprints against the committed
+    lock file. Returns a description per mismatch (empty = lock holds); does
+    not raise, so callers (a test, a CLI check) choose how to report it.
+
+    A mismatch means either a shipped version's file was edited in place
+    without a version bump (ADR-0013 violation — revert, or bump the version)
+    or the lock file is stale after a deliberate new version (regenerate it in
+    the same change: ``library_fingerprints(load_library())``).
+    """
+    registry = registry if registry is not None else load_library()
+    actual = library_fingerprints(registry)
+    lock_file = lock_path or _LOCK_PATH
+    if not lock_file.exists():
+        return (f"lock file missing: {lock_file}",)
+    committed = json.loads(lock_file.read_text(encoding="utf-8")).get("fingerprints", {})
+    mismatches = []
+    for qualified_name, fingerprint in sorted(actual.items()):
+        expected = committed.get(qualified_name)
+        if expected is None:
+            mismatches.append(f"{qualified_name}: not in lock file (new version, unlocked)")
+        elif expected != fingerprint:
+            mismatches.append(
+                f"{qualified_name}: content changed but version did not"
+                f" (locked {expected[:12]}…, actual {fingerprint[:12]}…)"
+            )
+    for qualified_name in sorted(set(committed) - set(actual)):
+        mismatches.append(f"{qualified_name}: locked but no longer shipped")
+    return tuple(mismatches)
 
 
 def _parse_prompt_file(path: Path) -> PromptTemplate:
