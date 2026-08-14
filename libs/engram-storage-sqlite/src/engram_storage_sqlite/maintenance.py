@@ -8,19 +8,70 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from engram_core.domain.errors import StorageError
 from engram_events import Projection
 from engram_storage_sqlite.event_store import SqliteEventStore, create_sqlite_engine
 from engram_storage_sqlite.migrate import upgrade_to_head
 from engram_storage_sqlite.projections.state import StateProjection
 
 _BATCH_SIZE = 500
+_MAX_REBUILD_ATTEMPTS = 3
+
+
+class _RebuildRace(Exception):
+    """Internal only — never escapes ``rebuild_projections``. Signals that a
+    projection's checkpoint moved out from under this rebuild pass; the pass
+    is unsound past that point and must restart from a fresh ``reset()``."""
 
 
 def rebuild_projections(store: SqliteEventStore, projections: Sequence[Projection]) -> int:
     """Reset every projection, then replay the full log from global_seq 0.
 
     Returns the number of envelopes replayed.
+
+    A rebuild pass assumes it is the only writer touching each projection's
+    checkpoint while it replays: it zeroes the checkpoint in ``reset()``, then
+    walks the log from the start, and ``apply()``'s own crash-recovery
+    idempotency check (``global_seq <= checkpoint``) treats any envelope at or
+    below the checkpoint as already applied. If a *live* writer commits an
+    ordinary event while a rebuild is mid-pass — `engram rebuild` running
+    concurrently with `engram add`/the API server, a realistic scenario, not
+    a contrived one — that write's own ``apply()`` jumps the checkpoint ahead
+    to its own (much higher) global_seq. Every subsequent envelope this
+    rebuild pass tries to replay then satisfies ``global_seq <= checkpoint``
+    and is silently skipped, even though ``reset()`` had just deleted its row
+    moments before: a permanently wrong, half-populated projection that
+    ``engram status`` (checkpoint-only drift detection) cannot see, since the
+    checkpoint itself is fully caught up — only the expensive differential
+    ``status --verify`` catches it. Confirmed via a deterministic
+    single-process reproduction (PRE-M10 GATE finding, concurrency P0).
+
+    Rather than giving every ``Projection`` implementation a shared
+    cross-process lock — a real change to the port every adapter implements,
+    not a contained one — this detects the exact moment a pass becomes
+    unsound (a projection's checkpoint isn't left at precisely the envelope
+    just handed to it) and restarts the whole pass from ``reset()``. Bounded:
+    if the checkpoint keeps moving because writes are continuous rather than
+    transient, this fails loudly with an actionable error instead of quietly
+    returning a wrong result. Costs one extra ``checkpoint()`` read per
+    envelope per projection versus the previous version — real, but paid
+    only by this already-documented-as-slow maintenance path
+    (docs/performance.md), never by any per-event write.
     """
+    last_race: _RebuildRace | None = None
+    for _attempt in range(_MAX_REBUILD_ATTEMPTS):
+        try:
+            return _rebuild_pass(store, projections)
+        except _RebuildRace as race:
+            last_race = race
+    raise StorageError(
+        f"engram rebuild did not complete after {_MAX_REBUILD_ATTEMPTS} attempts:"
+        f" {last_race}. Another process kept writing to this space throughout —"
+        " stop other `engram`/API activity against it and retry `engram rebuild`."
+    )
+
+
+def _rebuild_pass(store: SqliteEventStore, projections: Sequence[Projection]) -> int:
     for projection in projections:
         projection.reset()
     replayed = 0
@@ -33,6 +84,13 @@ def rebuild_projections(store: SqliteEventStore, projections: Sequence[Projectio
             for projection in projections:
                 if projection.handles(envelope.event_type):
                     projection.apply(envelope)
+                    landed = projection.checkpoint()
+                    if landed != envelope.global_seq:
+                        raise _RebuildRace(
+                            f"{projection.name} checkpoint at {landed}, expected"
+                            f" exactly {envelope.global_seq} right after replaying"
+                            " it — a concurrent write advanced it mid-rebuild"
+                        )
             replayed += 1
         last_seq = batch[-1].global_seq
         assert last_seq is not None
