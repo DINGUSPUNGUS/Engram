@@ -130,7 +130,7 @@ no accounts, no telemetry.
 - [Assistant Integrations](docs/integrations.md) — the gateway, adapters, capabilities, the recall boundary
 - [Domain model](docs/domain-model.md) · [Events](docs/events.md) · [Data flow](docs/data-flow.md)
 - [REST API](docs/api.md) · [Conventions](docs/conventions.md) · [Operations](docs/operations.md)
-- [Security](docs/security.md) · [Roadmap](docs/roadmap.md) · [ADRs](docs/adr/)
+- [Security](docs/security.md) · [Performance](docs/performance.md) · [Roadmap](docs/roadmap.md) · [ADRs](docs/adr/)
 
 ## Contributing
 

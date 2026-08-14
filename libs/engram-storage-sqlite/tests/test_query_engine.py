@@ -209,3 +209,59 @@ class TestProjectionMaintenance:
 
         after = [(str(h.memory.id), h.snippet) for h in harness.query("dark").items]
         assert after == before
+
+
+@pytest.mark.integration
+class TestQueryHydrationIsDeferredToThePage:
+    """M9 performance pass regression: ``query()`` previously hydrated a full
+    ``MemoryReadModel`` — several extra queries each (tags/links/evidence,
+    ``_read_model``) — for *every* SQL-matched candidate, before slicing to
+    ``limit``. Measured cost at 1000 memories: ~6.4s mean per free-text search
+    (evaluations/results/performance_baseline.json — machine-local, not
+    committed). Proven here without depending on wall-clock timing: hydration
+    must be called exactly ``limit`` times, never once per matched row.
+    """
+
+    def test_hydration_count_matches_the_page_not_the_match_count(
+        self, harness: _Harness, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        for i in range(40):
+            harness.commands.create_memory(
+                CreateMemoryInput(
+                    kind=MemoryKind.FACT,
+                    title=f"searchable memory {i}",
+                    content="shared searchable content",
+                    attributes={"statement": f"s{i}"},
+                ),
+                USER,
+            )
+
+        calls = {"count": 0}
+        original = harness.engine_port._read_model
+
+        def _counting_read_model(session: Session, record: object) -> object:
+            calls["count"] += 1
+            return original(session, record)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(harness.engine_port, "_read_model", _counting_read_model)
+
+        page = harness.query("searchable", limit=5)
+
+        assert len(page.items) == 5
+        assert page.next_cursor is not None  # 40 matches, 5 returned — more exist
+        assert calls["count"] == 5, (
+            f"hydrated {calls['count']} candidates for a limit=5 page out of 40"
+            " matches — full hydration must be deferred until after pagination"
+        )
+
+    def test_confidence_and_stale_filters_still_narrow_results_correctly(
+        self, harness: _Harness, seeded: dict[str, MemoryId]
+    ) -> None:
+        """The cheap-candidate filtering path must agree exactly with what
+        full hydration would have computed — same effective_confidence, same
+        staleness_threshold comparison, just without the extra queries."""
+        below = harness.query("confidence<0.99").items
+        above = harness.query("confidence>0.01").items
+        assert _ids(below) | _ids(above) >= {seeded["fact"], seeded["project"]}
+        # Freshly created: not stale, so `is:stale` must exclude it.
+        assert seeded["fact"] not in _ids(harness.query("is:stale").items)

@@ -277,3 +277,14 @@ An architecture review of this architecture. These are real risks, ranked.
     `LLMProvider` implementation they configured. Revisit with a dedicated ADR (and likely
     an out-of-process runtime) only if hostile-plugin isolation ever becomes a real
     requirement — not preemptively.
+12. **`synchronous=NORMAL` (M9 performance pass, [performance.md](performance.md)).**
+    Every event append and projection apply commits its own transaction (the P1
+    per-projection atomicity guarantee, deliberately unchanged); at the default
+    `synchronous=FULL`, each of those commits fsyncs, measured locally at ~11-20ms —
+    a full `engram rebuild` over a few thousand events costs minutes. `NORMAL` (the
+    documented-safe pairing with WAL) measured at ~0.3ms per commit. Trade-off accepted
+    explicitly: SQLite still guarantees the file itself is never corrupted, even on power
+    loss mid-write; what's given up is a guarantee that the most-recent commit or two
+    survives a power loss in that exact instant (full durability against an application
+    crash is unaffected). Right call for local-first desktop software with a single
+    writer; wrong one for a server of record — revisit only if that ever changes.

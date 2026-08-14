@@ -11,22 +11,18 @@ Ranked results use an opaque offset cursor (bm25 order is not id order).
 """
 
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlmodel import Session, col, select
 from sqlmodel.sql.expression import SelectOfScalar
 
-from engram_core.application.dto import (
-    ConfidenceFilter,
-    MemoryQuerySpec,
-    MemoryReadModel,
-    Page,
-    QueryHit,
-)
+from engram_core.application.dto import ConfidenceFilter, MemoryQuerySpec, Page, QueryHit
 from engram_core.domain.errors import ValidationError
-from engram_core.domain.scoring import ScoringConfig
-from engram_storage_sqlite.codec import to_naive_utc
+from engram_core.domain.scoring import ScoringConfig, effective_confidence
+from engram_core.domain.values import MemoryKind
+from engram_storage_sqlite.codec import from_naive_utc, to_naive_utc
 from engram_storage_sqlite.models import (
     EvidenceRecord,
     LinkRecord,
@@ -95,12 +91,21 @@ class SqliteQueryEngine(SqliteMemoryQuery):
 
             statement = self._build_statement(spec, text_hits, linked_id)
             records = session.exec(statement).all()
-            models = [self._read_model(session, record) for record in records]
+            candidates = self._filter_and_rank(records, spec, text_hits)
+            page_candidates = candidates[offset : offset + limit]
+            # Full hydration (tags/evidence/links + retention scoring — several
+            # extra queries each, by design in _read_model) only for the page
+            # actually returned, not every SQL-matched candidate: fetching it
+            # for every match before slicing to `limit` measured at ~6s for a
+            # free-text search over a 1000-memory space (M9 performance pass) —
+            # almost all of that work was discarded immediately after.
+            hits = [
+                QueryHit(memory=self._read_model(session, record), snippet=snippet, score=score)
+                for record, snippet, score in page_candidates
+            ]
 
-        hits = self._to_hits(models, spec, text_hits)
-        page = hits[offset : offset + limit]
-        next_cursor = str(offset + limit) if len(hits) > offset + limit else None
-        return Page(items=tuple(page), next_cursor=next_cursor)
+        next_cursor = str(offset + limit) if len(candidates) > offset + limit else None
+        return Page(items=tuple(hits), next_cursor=next_cursor)
 
     # -- pieces -------------------------------------------------------------------
 
@@ -197,26 +202,41 @@ class SqliteQueryEngine(SqliteMemoryQuery):
             )
         )
 
-    def _to_hits(
+    def _filter_and_rank(
         self,
-        models: Sequence[MemoryReadModel],
+        records: Sequence[MemoryRecord],
         spec: MemoryQuerySpec,
         text_hits: dict[str, tuple[str, float]] | None,
-    ) -> list[QueryHit]:
-        hits: list[QueryHit] = []
-        for model in models:
-            if spec.confidence is not None and not _matches_confidence(
-                model.effective_confidence, spec.confidence
-            ):
-                continue
-            if spec.stale is not None and model.stale is not spec.stale:
-                continue
+    ) -> list[tuple[MemoryRecord, str | None, float | None]]:
+        """Confidence/staleness filtering and text-relevance ranking — computed
+        straight from each record's own columns, with zero extra queries per
+        candidate. Deliberately returns raw records, not hydrated
+        ``MemoryReadModel``s: full hydration (``_read_model``) is for the
+        caller to apply *after* this list is paginated, not before.
+
+        ``effective_confidence`` needs only ``confidence``/``kind``/
+        ``last_confirmed_at``/``created_at`` off the record itself — none of
+        tags, links, or evidence, which is what made deferring hydration safe.
+        """
+        now = datetime.now(UTC)
+        candidates: list[tuple[MemoryRecord, str | None, float | None]] = []
+        for record in records:
+            if spec.confidence is not None or spec.stale is not None:
+                kind = MemoryKind(record.kind)
+                anchor = from_naive_utc(record.last_confirmed_at or record.created_at)
+                c_eff = effective_confidence(record.confidence, kind, anchor, now, self._config)
+                if spec.confidence is not None and not _matches_confidence(c_eff, spec.confidence):
+                    continue
+                if spec.stale is not None:
+                    stale = c_eff < self._config.staleness_threshold[kind]
+                    if stale is not spec.stale:
+                        continue
             snippet, score = (None, None)
             if text_hits is not None:
-                snip, rank = text_hits[str(model.id)]
+                snip, rank = text_hits[str(record.id)]
                 # bm25 is lower-is-better; negate so callers can sort descending.
                 snippet, score = snip, -rank
-            hits.append(QueryHit(memory=model, snippet=snippet, score=score))
+            candidates.append((record, snippet, score))
         if text_hits is not None:
-            hits.sort(key=lambda hit: (-(hit.score or 0.0), str(hit.memory.id)))
-        return hits
+            candidates.sort(key=lambda c: (-(c[2] or 0.0), str(c[0].id)))
+        return candidates

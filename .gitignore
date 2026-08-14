@@ -44,6 +44,12 @@ Thumbs.db
 # Logs
 *.log
 
+# Machine-dependent performance benchmark output (docs/performance.md,
+# scripts/benchmark_perf.py) -- not a committed regression gate the way
+# evaluations/results/baseline.json is for AI quality; absolute numbers vary
+# by machine and are never comparable across runs on different hardware.
+evaluations/results/performance_baseline.json
+
 # vexp (LSP-free code index) — machine-local daemon state.
 # manifest.json is intentionally tracked (vexp sets merge=union on it);
 # the lock holds a PID and the marker tracks a local daemon, so neither
