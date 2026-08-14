@@ -139,6 +139,61 @@ def test_plugins_run_fails_cleanly_when_package_missing(
     assert "Traceback" not in result.output
 
 
+def test_build_plugin_registry_discovers_installed_third_party_entry_points(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """M9 packaging audit regression: ``engram_plugins.registry.
+    discover_entry_points`` was real and unit-tested, but the CLI's actual
+    composition root (``build_plugin_registry``) never called it — a
+    correctly-installed third-party plugin, advertising the documented
+    ``engram.plugins`` entry point exactly as docs/plugins.md §8 instructs,
+    was silently invisible to the real ``engram`` binary. Proven here by
+    faking one installed entry point and asserting it reaches the registry
+    the CLI actually builds, at REGISTERED (not auto-trusted/enabled)."""
+    import importlib.metadata as metadata
+
+    from engram_plugins.contract import (
+        PLUGIN_API_VERSION,
+        Capability,
+        PluginContext,
+        PluginDescriptor,
+    )
+    from engram_plugins.registry import PluginStatus
+
+    class _FakeThirdPartyPlugin:
+        descriptor = PluginDescriptor(
+            plugin_id="dev.example.fake-third-party",
+            name="fake third-party plugin",
+            version="1.0.0",
+            api_version=PLUGIN_API_VERSION,
+            capabilities=frozenset({Capability.QUERY}),
+        )
+
+        def run(self, context: PluginContext, gateway: object) -> object:
+            raise NotImplementedError
+
+    class _FakeEntryPoint:
+        name = "fake-third-party"
+
+        def load(self) -> type[_FakeThirdPartyPlugin]:
+            return _FakeThirdPartyPlugin
+
+    def fake_entry_points(*, group: str) -> tuple[object, ...]:
+        assert group == "engram.plugins"
+        return (_FakeEntryPoint(),)
+
+    monkeypatch.setattr(metadata, "entry_points", fake_entry_points)
+
+    from engram_cli.plugins import build_plugin_registry
+
+    registry = build_plugin_registry()
+
+    record = registry.get("dev.example.fake-third-party")
+    assert record.status is PluginStatus.REGISTERED  # discovered, not auto-enabled
+    # The in-tree reference plugin is still there too — discovery adds, doesn't replace.
+    assert registry.get("dev.engram.reference-url-evidence").status is PluginStatus.ENABLED
+
+
 def test_missing_plugins_guard_does_not_swallow_unrelated_import_failures() -> None:
     """Unit-level proof that the guard is scoped to ``engram_plugins``
     specifically (not any ``ModuleNotFoundError`` that happens to surface

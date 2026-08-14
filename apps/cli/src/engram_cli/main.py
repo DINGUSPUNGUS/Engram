@@ -65,13 +65,31 @@ def _memory_line(memory: MemoryReadModel) -> str:
     )
 
 
-@app.callback(invoke_without_command=False)
-def main(
-    version: Annotated[bool, typer.Option("--version", help="Print version and exit")] = False,
-) -> None:
-    if version:
+def _print_version(value: bool) -> None:
+    # Eager: Click resolves eager options during argument parsing, before it
+    # decides whether a subcommand is present — the only way `--version`
+    # can work without one. A plain (non-eager) option here never runs at
+    # all on a bare `engram --version`: with invoke_without_command=False,
+    # Click's Group.invoke() raises "Missing command" and never calls this
+    # callback's owning command body in the first place.
+    if value:
         typer.echo(__version__)
         raise typer.Exit()
+
+
+@app.callback(invoke_without_command=False)
+def main(
+    version: Annotated[
+        bool,
+        typer.Option(
+            "--version",
+            callback=_print_version,
+            is_eager=True,
+            help="Print version and exit",
+        ),
+    ] = False,
+) -> None:
+    pass
 
 
 @app.command()

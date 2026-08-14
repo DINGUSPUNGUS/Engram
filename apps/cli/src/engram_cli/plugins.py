@@ -11,15 +11,21 @@ from engram_plugins.registry import PluginRegistry
 
 
 def build_plugin_registry() -> PluginRegistry:
-    """The in-tree reference plugin, registered and enabled by default.
+    """The in-tree reference plugin, registered and enabled by default, plus
+    whatever third-party packages the active environment has installed under
+    the ``engram.plugins`` entry-point group (docs/plugins.md §4/§8).
 
-    A real deployment would also call ``registry.discover_entry_points()``
-    here to pick up installed third-party packages — omitted for the CLI's
-    default composition since none exist yet; the mechanism is already
-    library-level and tested (``engram_plugins.registry``)."""
+    Discovery grants no trust: a discovered plugin lands at ``REGISTERED``,
+    not ``ENABLED`` (ADR-0024 §3) — an operator must still explicitly
+    ``engram plugins enable <id>`` before it can run. This was previously a
+    tested-but-uncalled library mechanism (M9 packaging audit): a package
+    installed alongside engram and correctly advertising the entry point
+    was never actually discovered by the real CLI binary, only by
+    ``engram_plugins.registry``'s own unit tests calling it directly."""
     registry = PluginRegistry()
     registry.register(ReferenceUrlEvidencePlugin())
     registry.enable(ReferenceUrlEvidencePlugin().descriptor.plugin_id)
+    registry.discover_entry_points()
     return registry
 
 
