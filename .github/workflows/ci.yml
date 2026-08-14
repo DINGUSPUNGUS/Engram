@@ -9,6 +9,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Least-privilege default: nothing in this workflow pushes commits, writes
+# releases, or comments — read access to repo contents is all any job needs.
+# pr-title elevates explicitly to pull-requests: read for its own step.
+permissions:
+  contents: read
+
 jobs:
   changes:
     runs-on: ubuntu-latest
@@ -58,6 +64,7 @@ jobs:
           libs/engram-events/src libs/engram-core/src
           libs/engram-storage-sqlite/src libs/engram-export-git/src
           libs/engram-intelligence/src libs/engram-observatory/src
+          libs/engram-assistants/src libs/engram-plugins/src
           apps/api/src apps/cli/src apps/mcp/src
       - name: Test (pytest)
         run: uv run pytest libs apps -ra

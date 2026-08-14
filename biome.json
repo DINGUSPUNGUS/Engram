@@ -12,7 +12,9 @@
       "!**/.next",
       "!**/.turbo",
       "!**/dist",
-      "!packages/api-client/src/generated"
+      "!packages/api-client/src/generated",
+      "!packages/api-client/openapi.json",
+      "!.vexp/manifest.json"
     ]
   },
   "formatter": {
