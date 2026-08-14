@@ -2,18 +2,39 @@
 
 ``load`` = read the stream + ``fold``; ``append`` = delegate to the event store.
 Thin by design — aggregate logic stays in engram-core.
+
+``engram_events.OptimisticConcurrencyError`` is a storage-library exception, not
+an ``EngramError`` — it must not cross the ``MemoryRepository``/``ProposalRepository``
+port. ``_translate_conflict`` is the one place that happens, translating a genuine
+race (two writers appending to the same stream position at once) into the
+``StaleVersionError`` the ports already document. This is the same conflict the
+application layer's own pre-append version check raises for the common case
+(``MemoryCommandService._load_at``); this is the fallback for the narrower window
+that check cannot close — a second writer committing between load and append.
 """
 
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from datetime import datetime
 
-from engram_core.domain.errors import NotFoundError
+from engram_core.domain.errors import NotFoundError, StaleVersionError
 from engram_core.domain.kinds import KindRegistry
 from engram_core.domain.memory import Memory
 from engram_core.domain.proposal import Proposal
 from engram_core.domain.values import MemoryId, ProposalId
-from engram_events import EventEnvelope
+from engram_events import EventEnvelope, OptimisticConcurrencyError
 from engram_storage_sqlite.event_store import SqliteEventStore
+
+
+@contextmanager
+def _translate_conflict() -> Iterator[None]:
+    try:
+        yield
+    except OptimisticConcurrencyError as exc:
+        raise StaleVersionError(
+            f"stream {exc.stream_id}: expected next seq {exc.expected_seq},"
+            f" but stream is at {exc.actual_seq} — reload and retry"
+        ) from exc
 
 
 class SqliteMemoryRepository:
@@ -38,7 +59,13 @@ class SqliteMemoryRepository:
         return memory
 
     def append(self, envelopes: Sequence[EventEnvelope]) -> Sequence[EventEnvelope]:
-        return self._store.append(envelopes)
+        """Append envelopes to the store.
+
+        Raises:
+            StaleVersionError: a competing writer already took this stream position.
+        """
+        with _translate_conflict():
+            return self._store.append(envelopes)
 
     def state_at(
         self,
@@ -81,4 +108,10 @@ class SqliteProposalRepository:
         return Proposal.fold(envelopes)
 
     def append(self, envelopes: Sequence[EventEnvelope]) -> Sequence[EventEnvelope]:
-        return self._store.append(envelopes)
+        """Append envelopes to the store.
+
+        Raises:
+            StaleVersionError: a competing writer already took this stream position.
+        """
+        with _translate_conflict():
+            return self._store.append(envelopes)

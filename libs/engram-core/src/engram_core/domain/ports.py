@@ -53,7 +53,13 @@ class ProposalRepository(Protocol):
 
     def load(self, proposal_id: ProposalId) -> Proposal: ...
 
-    def append(self, envelopes: Sequence[EventEnvelope]) -> Sequence[EventEnvelope]: ...
+    def append(self, envelopes: Sequence[EventEnvelope]) -> Sequence[EventEnvelope]:
+        """Append new envelopes (optimistic-concurrency-checked via stream_seq).
+
+        Raises:
+            StaleVersionError: if the expected stream position was taken.
+        """
+        ...
 
 
 class UnitOfWork(Protocol):
