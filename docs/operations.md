@@ -47,7 +47,7 @@ Rules:
 | `ENGRAM_DATA_DIR` | `~/.engram` | Root for all engram state |
 | `ENGRAM_DB_PATH` | `<data>/engram.db` | SQLite: event log + projections |
 | `ENGRAM_EXPORT_REPO` | `<data>/memory` | Git repo receiving the markdown/NDJSON export |
-| `ENGRAM_API_HOST` / `ENGRAM_API_PORT` | `127.0.0.1` / `8000` | API bind (loopback: see security.md) |
+| `ENGRAM_API_HOST` / `ENGRAM_API_PORT` | `127.0.0.1` / `8000` | API bind (loopback: see security.md). The published Docker image defaults its own `ENGRAM_API_HOST` to `0.0.0.0` — required for `-p`/compose port publishing to reach it at all; `docker-compose.yml`'s host-side `127.0.0.1:8000:8000` mapping is what keeps that loopback-only. |
 | `ENGRAM_LOG_LEVEL` / `ENGRAM_LOG_FORMAT` | `INFO` / `console` | Logging |
 | `ENGRAM_ENV` | `development` | `development · production · test` |
 | `ENGRAM_LLM_PROVIDER` | `ollama` | Ingestion-pipeline model backend (ADR-0012): `ollama · claude · openai · gemini` |
