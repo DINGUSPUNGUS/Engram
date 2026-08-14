@@ -29,7 +29,11 @@ from engram_export_git.exporter import ExportEngine
 from engram_export_git.reconciler import GitReconciler
 from engram_export_git.repo import GitVersionControl
 from engram_storage_sqlite.event_store import SqliteEventStore, create_sqlite_engine
-from engram_storage_sqlite.maintenance import rebuild_projections
+from engram_storage_sqlite.maintenance import (
+    ProjectionFidelityReport,
+    rebuild_projections,
+    verify_projection_fidelity,
+)
 from engram_storage_sqlite.migrate import upgrade_to_head
 from engram_storage_sqlite.projections.proposals import ProposalProjection
 from engram_storage_sqlite.projections.search import SearchProjection
@@ -74,6 +78,14 @@ class Runtime:
     def status(self) -> SpaceStatus:
         """Log totals and per-projection checkpoints (ADR-0021 ``/stats``)."""
         return space_status(self.engine, self._projections())
+
+    def verify_fidelity(self) -> ProjectionFidelityReport:
+        """Differential rebuild check: catches a state projection that is
+        caught up (checkpoint lag 0) but computed the wrong content — the
+        blind spot ``status()``'s lag alone cannot see. Not part of the
+        regular ``status()`` call: a full log replay, so it's opt-in
+        (``engram status --verify`` / deliberate use), not automatic."""
+        return verify_projection_fidelity(self.store, self.state_projection)
 
     def _projections(self) -> tuple[_Projection, ...]:
         return (self.state_projection, self.search_projection, self.proposals_projection)

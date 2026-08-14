@@ -20,7 +20,11 @@ from engram_events import EventEnvelope, InProcessEventBus, SystemClock
 from engram_export_git.exporter import ExportEngine
 from engram_export_git.importer import ImportEngine
 from engram_storage_sqlite.event_store import SqliteEventStore, create_sqlite_engine
-from engram_storage_sqlite.maintenance import rebuild_projections
+from engram_storage_sqlite.maintenance import (
+    ProjectionFidelityReport,
+    rebuild_projections,
+    verify_projection_fidelity,
+)
 from engram_storage_sqlite.projections.proposals import ProposalProjection
 from engram_storage_sqlite.projections.search import SearchProjection
 from engram_storage_sqlite.projections.state import StateProjection
@@ -55,6 +59,12 @@ class Runtime:
 
     def status(self) -> SpaceStatus:
         return space_status(self.engine, self._projections())
+
+    def verify_fidelity(self) -> ProjectionFidelityReport:
+        """Differential rebuild check: catches a state projection that is
+        caught up (checkpoint lag 0) but computed the wrong content — a full
+        log replay, so opt-in (``engram status --verify``), not automatic."""
+        return verify_projection_fidelity(self.store, self.state_projection)
 
     def _projections(
         self,

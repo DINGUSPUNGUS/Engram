@@ -118,6 +118,14 @@ def test_query_engine_status_and_time_travel(space: Path) -> None:
     assert "state" in result.output and "search" in result.output
     assert "DRIFTED" not in result.output
 
+    # -- status --verify: differential rebuild check (P1 hardening) -------------
+    # Lag alone (above) can't prove the state projection's *content* is right,
+    # only that it's caught up. On a healthy space this must pass, not just run.
+    result = runner.invoke(app, ["status", "--verify"])
+    assert result.exit_code == 0, result.output
+    assert "verified" in result.output
+    assert "MISMATCH" not in result.output
+
     # -- the query language: one string, many operators --------------------------
     result = runner.invoke(app, ["search", "dark"])
     assert result.exit_code == 0, result.output

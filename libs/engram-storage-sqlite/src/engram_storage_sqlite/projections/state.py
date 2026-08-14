@@ -6,6 +6,7 @@ transaction — replaying the whole log always lands on the same rows
 (the M1 invariant, CI-tested).
 """
 
+import hashlib
 import json
 
 from sqlalchemy import func
@@ -68,6 +69,52 @@ class StateProjection:
     def checkpoint(self) -> int:
         with Session(self._engine) as session:
             return self._checkpoint_row(session).last_global_seq
+
+    def fingerprint(self) -> str:
+        """Deterministic content hash of everything this projection currently
+        believes — independent of ``checkpoint`` (log *position*, not content).
+
+        ``checkpoint``/lag-based drift detection (status.py) proves a
+        projection is caught up with the log; it cannot prove the state it
+        computed while catching up was *correct* — a projection with a buggy
+        merge rule can sit at ``lag == 0`` and still hold the wrong state
+        forever, silently. Two independently-built copies of this projection
+        replaying the identical log must fingerprint identically; a mismatch
+        at equal checkpoints is exactly that class of bug
+        (``maintenance.verify_projection_fidelity`` is the check that uses this).
+        """
+        with Session(self._engine) as session:
+            parts = [
+                json.dumps(row.model_dump(mode="json"), sort_keys=True, default=str)
+                for row in session.exec(select(MemoryRecord).order_by(col(MemoryRecord.id))).all()
+            ]
+            parts += [
+                json.dumps(row.model_dump(mode="json"), sort_keys=True, default=str)
+                for row in session.exec(
+                    select(MemoryTagRecord).order_by(
+                        col(MemoryTagRecord.memory_id), col(MemoryTagRecord.tag)
+                    )
+                ).all()
+            ]
+            parts += [
+                json.dumps(row.model_dump(mode="json"), sort_keys=True, default=str)
+                for row in session.exec(
+                    select(LinkRecord).order_by(
+                        col(LinkRecord.source_id),
+                        col(LinkRecord.target_id),
+                        col(LinkRecord.relation),
+                    )
+                ).all()
+            ]
+            parts += [
+                json.dumps(row.model_dump(mode="json"), sort_keys=True, default=str)
+                for row in session.exec(
+                    select(EvidenceRecord).order_by(
+                        col(EvidenceRecord.memory_id), col(EvidenceRecord.seq)
+                    )
+                ).all()
+            ]
+        return hashlib.sha256("\x1e".join(parts).encode("utf-8")).hexdigest()
 
     def reset(self) -> None:
         """Truncate all state tables and zero the checkpoint (pre-rebuild)."""

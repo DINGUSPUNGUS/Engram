@@ -285,7 +285,21 @@ def rebuild() -> None:
 
 
 @app.command()
-def status() -> None:
+def status(
+    verify: Annotated[
+        bool,
+        typer.Option(
+            "--verify",
+            help=(
+                "Also run a differential rebuild check on the state projection:"
+                " catches a projection that is caught up (lag 0) but computed the"
+                " wrong content — checkpoint lag alone cannot see this. Replays"
+                " the whole log into a scratch copy, so it costs what `engram"
+                " rebuild` costs; not run by default."
+            ),
+        ),
+    ] = False,
+) -> None:
     """Show the space's health: event log totals and projection drift."""
 
     def action() -> None:
@@ -304,6 +318,28 @@ def status() -> None:
                 "projection drift detected — run `engram rebuild` (always safe)",
                 fg=typer.colors.YELLOW,
             )
+        if verify:
+            fidelity = runtime.verify_fidelity()
+            if not fidelity.comparable:
+                typer.secho(
+                    "state: cannot verify — projection is behind the log"
+                    " (run `engram rebuild`, then retry --verify)",
+                    fg=typer.colors.YELLOW,
+                )
+            elif fidelity.logic_bug_detected:
+                typer.secho(
+                    "state: CONTENT MISMATCH — checkpoint matches a full rebuild of"
+                    " the log, but the content does not. This is a projection logic"
+                    " bug, not drift; `engram rebuild` will make it match the log"
+                    " again, but the bug that produced the wrong state first should"
+                    " still be found and fixed.",
+                    fg=typer.colors.RED,
+                )
+            else:
+                typer.secho(
+                    "state: verified — content matches a full rebuild of the log",
+                    fg=typer.colors.GREEN,
+                )
 
     _run(action)
 
