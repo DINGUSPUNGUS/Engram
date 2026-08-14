@@ -16,7 +16,12 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlmodel import Session, col, create_engine, func, select
 
 from engram_core.domain.errors import StorageError
-from engram_events import EventEnvelope, EventRegistry, OptimisticConcurrencyError
+from engram_events import (
+    EventEnvelope,
+    EventRegistry,
+    OptimisticConcurrencyError,
+    UnknownEventTypeError,
+)
 from engram_storage_sqlite.codec import (
     decode_payload,
     decode_provenance,
@@ -136,9 +141,32 @@ class SqliteEventStore:
         try:
             with Session(self._engine) as session:
                 records = session.exec(statement).all()  # type: ignore[call-overload]
+            return tuple(self._to_envelope(record) for record in records)
         except SQLAlchemyError as exc:
             raise StorageError(f"event read failed: {exc}") from exc
-        return tuple(self._to_envelope(record) for record in records)
+        except UnknownEventTypeError as exc:
+            # A row names an event type (or asks to upcast from a schema_version)
+            # this build's registry has no registration for -- a downgraded
+            # binary, a plugin that owned the type since uninstalled, or a
+            # corrupted row. Previously propagated raw past every EngramError
+            # boundary (CLI/API alike), contradicting `engram rebuild`'s own
+            # "(always safe)" messaging (PRE-M10 GATE finding, event sourcing
+            # P1 / security P1 -- confirmed by two independent audits).
+            raise StorageError(
+                f"cannot read event: {exc}. This space contains an event type"
+                " this build of engram does not recognize -- from a newer"
+                " engram, an uninstalled plugin, or a corrupted database."
+                " Reinstalling the plugin/build that wrote it (if known) is"
+                " the only recovery; this is not something `engram rebuild`"
+                " can repair."
+            ) from exc
+        except (ValueError, TypeError) as exc:
+            # decode_payload/decode_provenance's own json.loads() calls, on a
+            # payload/provenance column that isn't valid JSON -- the same
+            # "corrupted row" class of failure as above, just caught here
+            # rather than inside the codec (kept together with the case above
+            # so every unsafe-to-replay row fails the same clean way).
+            raise StorageError(f"cannot read event: corrupted stored data: {exc}") from exc
 
     def _to_envelope(self, record: EventRecord) -> EventEnvelope:
         return EventEnvelope(

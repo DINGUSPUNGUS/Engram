@@ -891,5 +891,33 @@ def _runtime() -> Runtime:
 
 
 def run() -> None:
-    """Entry point for the ``engram`` script."""
-    app()
+    """Entry point for the ``engram`` script.
+
+    Implements the exit-code contract's "70 unexpected internal error" case:
+    without this, an exception ``_run`` doesn't recognize as ``EngramError``
+    propagates uncaught out of ``app()`` and is rendered by Typer/Rich's
+    default traceback hook — a raw internal dump, not the actionable-guidance
+    pattern the rest of the CLI uses, and exit code 1 (indistinguishable from
+    an ordinary expected failure), despite this module's own docstring having
+    promised 70 since M1. Confirmed via `engram rebuild`/`status --verify`
+    against a database containing an event type this build doesn't recognize
+    (PRE-M10 GATE finding, event sourcing/security P1).
+    """
+    try:
+        app()
+    except (SystemExit, KeyboardInterrupt):
+        # Click's own main() already translated every expected outcome
+        # (success, `_run`'s EngramError -> exit 1, --help, etc.) into one of
+        # these before `app()` returns — pass them through unchanged.
+        raise
+    except Exception as exc:
+        # Anything else reached here *without* Click converting it, meaning
+        # it is genuinely unexpected. `typer.Exit`/`raise ... from` only
+        # unwinds to a clean `sys.exit` when raised *inside* Click's own
+        # invocation machinery (a command body, or `_run`) — this code runs
+        # after `app()` has already unwound past that machinery, so the exit
+        # itself must be a raw `SystemExit`, not `typer.Exit`.
+        typer.secho(
+            f"engram hit an unexpected internal error: {exc}", fg=typer.colors.RED, err=True
+        )
+        raise SystemExit(70) from exc

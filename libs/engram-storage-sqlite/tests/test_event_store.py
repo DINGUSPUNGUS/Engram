@@ -5,10 +5,13 @@ from uuid import UUID
 
 import pytest
 from sqlalchemy.engine import Engine
+from sqlmodel import Session
 
+from engram_core.domain.errors import StorageError
 from engram_core.domain.events import MemoryCreated, MemoryLifetimeChanged, build_registry
 from engram_events import EventEnvelope, OptimisticConcurrencyError, Provenance, new_uuid7
 from engram_storage_sqlite.event_store import SqliteEventStore
+from engram_storage_sqlite.models import EventRecord
 
 
 @pytest.fixture
@@ -83,3 +86,69 @@ def test_read_all_pages_by_global_seq(store: SqliteEventStore) -> None:
     assert len(first_two) == 2
     assert len(rest) == 1
     assert (rest[0].global_seq or 0) > (first_two[-1].global_seq or 0)
+
+
+@pytest.mark.integration
+def test_unknown_event_type_fails_safely_instead_of_raw_crash(
+    store: SqliteEventStore, engine: Engine
+) -> None:
+    """PRE-M10 GATE finding (event sourcing / security P1, confirmed by two
+    independent audits): a row naming an event type this build's registry has
+    no registration for — a downgraded binary, an uninstalled plugin, a
+    corrupted row — used to propagate a raw ``UnknownEventTypeError`` (not an
+    ``EngramError``) straight out of ``read_all``/``read_stream``, past every
+    ``EngramError`` boundary the CLI/API rely on, contradicting `engram
+    rebuild`'s own "(always safe)" messaging. Confirmed via a real
+    ``engram rebuild``/``status --verify`` run against a hand-corrupted
+    database before this fix landed: a full Python traceback, exit code 1
+    (not even the documented 70), no actionable guidance.
+    """
+    stream = new_uuid7()
+    store.append([_envelope(stream, 1, _created(stream))])
+    with Session(engine) as session:
+        session.add(
+            EventRecord(
+                event_id=str(new_uuid7()),
+                stream_id=str(stream),
+                stream_seq=2,
+                event_type="MemoryCreatedFutureBogusType",
+                schema_version=1,
+                payload="{}",
+                occurred_at=datetime(2026, 7, 12, 9, 30),
+                provenance='{"actor": "user"}',
+            )
+        )
+        session.commit()
+
+    with pytest.raises(StorageError, match="MemoryCreatedFutureBogusType"):
+        store.read_all()
+    with pytest.raises(StorageError, match="MemoryCreatedFutureBogusType"):
+        store.read_stream(stream)
+
+
+@pytest.mark.integration
+def test_corrupted_payload_json_fails_safely_instead_of_raw_crash(
+    store: SqliteEventStore, engine: Engine
+) -> None:
+    """Same class of defect as the unknown-event-type case above, just via a
+    payload column that isn't valid JSON (bit rot, a hand-edited row, a
+    truncated write) rather than an unregistered type name."""
+    stream = new_uuid7()
+    store.append([_envelope(stream, 1, _created(stream))])
+    with Session(engine) as session:
+        session.add(
+            EventRecord(
+                event_id=str(new_uuid7()),
+                stream_id=str(stream),
+                stream_seq=2,
+                event_type="MemoryLifetimeChanged",
+                schema_version=1,
+                payload="{not valid json",
+                occurred_at=datetime(2026, 7, 12, 9, 30),
+                provenance='{"actor": "user"}',
+            )
+        )
+        session.commit()
+
+    with pytest.raises(StorageError, match="corrupted stored data"):
+        store.read_stream(stream)
