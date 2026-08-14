@@ -1,13 +1,17 @@
 # engram
 
-> **Status: pre-alpha.** The event core works (M1), the query engine works (M2), the
+> **Status: pre-1.0.** The event core works (M1), the query engine works (M2), the
 > space is portable (M3), every mutation flows through a **review pipeline** (M4), and
 > the **intelligence pipeline is live** (M5): `engram ingest` extracts typed, evidence-
 > cited memory candidates from conversations — locally, via Ollama — and its only power
 > is to open a proposal. AI proposes; events decide. **Assistants are connected** (M6):
 > ChatGPT, Claude, and Gemini share the substrate through one gateway whose tool surface
-> has no review verbs. The dashboard and MCP transport land milestone by milestone
-> ([roadmap](docs/roadmap.md)).
+> has no review verbs. **The web dashboard is live** (M7): Memory Explorer, Proposal
+> Review, Timeline, Observatory, Console, and Settings, with SSE live updates. **The
+> plugin architecture is live** (M8): a capability-gated, read-plus-one-proposal-door
+> extension surface, proven by a reference plugin wired into the CLI. M9 (hardening,
+> packaging, upgrade story, docs, performance) is in progress. The MCP transport itself
+> remains a stub over the existing assistant gateway ([roadmap](docs/roadmap.md)).
 
 **engram** is a local-first, user-owned memory engine for AI assistants. It lets ChatGPT,
 Claude, Gemini, Cursor, Copilot, Ollama, and anything else that speaks MCP or REST share a
@@ -70,8 +74,8 @@ tables      later)                   │
 | `evaluations/` | Golden cases + synthetic corpus spec + the committed quality baseline. |
 | `apps/api` | FastAPI REST server (thin shell over application services). |
 | `apps/cli` | `engram` command-line interface (Typer). |
-| `apps/mcp` | MCP server (stub — milestone M6). |
-| `apps/web` | Next.js 15 dashboard. |
+| `apps/mcp` | MCP server (stub — the assistant gateway it will wrap is done; the stdio transport itself isn't built yet). |
+| `apps/web` | Next.js 15 dashboard: Memory Explorer, Proposal Review, Timeline, Observatory, Console, Settings (M7). |
 | `packages/api-client` | TypeScript client generated from the OpenAPI contract. |
 | `docs/` | Architecture, ADRs, conventions, roadmap. Start with [docs/architecture.md](docs/architecture.md). |
 
@@ -91,7 +95,8 @@ uv run engram list
 uv run engram search "kind:project status:active dark mode"   # the query language
 uv run engram show <id>      # full state + event timeline
 uv run engram show <id> --version 1   # time travel: the memory as it first existed
-uv run engram status         # event log totals + projection drift detection
+uv run engram status         # event log totals + projection drift detection (checkpoint lag)
+uv run engram status --verify  # + differential rebuild: catches wrong *content* at lag 0 too
 uv run engram rebuild        # drop projections, replay the log — same state
 
 uv run engram export         # deterministic markdown+NDJSON repo (~/.engram/memory)
@@ -110,7 +115,7 @@ uv run engram proposals show <id>        # inspect every draft intent
 uv run engram proposals approve <id> && uv run engram proposals merge <id>
 uv run engram proposals undo <id>        # compensating events — history never rewritten
 
-pnpm dev                     # API on :8000, web on :3000 (route stubs until M7)
+pnpm dev                     # API on :8000, web dashboard on :3000
 ```
 
 Everything runs locally. No Docker required (compose files exist for convenience), no cloud,

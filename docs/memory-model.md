@@ -283,6 +283,8 @@ Archived/Restored, Deleted, Accessed — unchanged.)
 - No probabilistic truth maintenance beyond the single confidence scalar — a full
   belief-revision system is not worth its complexity here.
 - No user-defined kinds (yet): kind #13 is a PR with a schema + ADR, not runtime config.
-  Revisit when plugins land (milestone M8).
+  The plugin architecture (M8, `docs/plugins.md`) does not change this — a plugin can
+  read and propose against the twelve existing kinds, not register new ones. No
+  milestone currently plans runtime-defined kinds; revisit if a real need appears.
 - No cross-space references: a memory space is a hard boundary.
 - No automatic conflict *decisions*: automation proposes, events decide (§8).

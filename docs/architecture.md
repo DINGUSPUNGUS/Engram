@@ -78,7 +78,7 @@ engram/
 ├── apps/
 │   ├── api/        FastAPI shell (routers, schemas, DI wiring, error mapping)
 │   ├── cli/        Typer shell (`engram` command)
-│   ├── mcp/        MCP server (deliberately empty until milestone M6)
+│   ├── mcp/        MCP server (stub — the gateway it will wrap, engram-assistants, is done)
 │   └── web/        Next.js 15 dashboard (App Router, Tailwind v4, shadcn/ui)
 ├── packages/
 │   ├── api-client/ TS client generated from the OpenAPI contract (openapi-fetch)
@@ -230,12 +230,14 @@ An architecture review of this architecture. These are real risks, ranked.
    make rebuilds incremental; snapshots are reserved as a pure optimization in ADR-0002;
    CONTRIBUTING.md teaches the given/when/then test idiom. At personal-memory scale
    (thousands of events, not billions) replay cost is a non-issue for years.
-2. **Markdown two-way sync is now the hardest subsystem.** With SQLite canonical, a direct
-   file edit must be detected, parsed, validated, and appended as events — a mini sync
-   engine with conflict semantics. Contained: it is one port (`MarkdownSync`), one adapter
-   package, and deliberately deferred to milestone M3 so the event core stabilizes
-   first. The fallback if it proves intractable: export stays one-way and external edits
-   become proposals a human approves in the dashboard.
+2. **Markdown two-way sync could have become the hardest subsystem.** With SQLite
+   canonical, a direct file edit needs detecting, parsing, validating, and turning into
+   events — a mini sync engine with conflict semantics, if built as live, automatic,
+   two-way sync. Resolved in M3/M4 by not building that: export is one-way
+   (`MarkdownSync`, one port, one adapter package); a human-edited file only re-enters
+   through `engram import`, which reconciles it against the current aggregate and opens
+   an edit-intent **proposal** — never a direct write, and never automatic. There is no
+   live watcher and no background sync process anywhere in the system.
 3. **"Everything through events" can over-decouple.** Explicitly bounded: writes flow
    through the log, reads are synchronous calls. The bus is in-process and synchronous
    until profiling says otherwise. Async infrastructure without a measured need is

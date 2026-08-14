@@ -56,3 +56,24 @@ Rules:
 
 `.env.example` at the repo root is the canonical, commented list — keep it in sync with
 this table in the same PR.
+
+## Upgrading
+
+`engram init`'s own message says it: it both creates a new space and upgrades an
+existing one — the same idempotent Alembic migration (`upgrade_to_head`) either way, so
+re-running it against a database already at the current schema does nothing.
+
+The API auto-migrates its database to head on every process start (it has no notion of
+"the user is about to run a command" to defer to). The CLI does not: opening a space
+whose schema predates the binary's migrations fails fast with a message naming the
+current and expected schema revision, rather than running a write against columns that
+don't exist yet (ADR-0026). Run `engram init` to upgrade in place — your event history
+is untouched by this, since `events` is one append-only table that hasn't changed shape
+since the very first migration — then `engram rebuild` to re-project the log into the
+now-current schema.
+
+Event payloads, memory-kind attributes, and proposal drafts each carry their own schema
+version and upcaster chain (`engram_events.registry`, `engram_core.domain.kinds`,
+`engram_core.application.commands.drafts`), so a historical event of any age always
+replays correctly regardless of which version of engram wrote it — upgrading the SQLite
+schema is the only manual step.
