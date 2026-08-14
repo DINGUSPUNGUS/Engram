@@ -7,6 +7,8 @@ handlers translate exactly once.
 
 import structlog
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
@@ -66,3 +68,31 @@ def register_error_handlers(app: FastAPI) -> None:
             "Not implemented",
             "engram is in its architecture phase; this endpoint is specified but not built yet.",
         )
+
+    @app.exception_handler(RequestValidationError)
+    async def handle_request_validation_error(
+        request: Request, exc: RequestValidationError
+    ) -> JSONResponse:
+        """FastAPI's own request-parsing failures (a missing/out-of-range query
+        param, an unparseable path param, a malformed body) run before any
+        router body executes, so they never reach ``handle_engram_error`` above
+        — but every operation's OpenAPI schema still promises its 4XX response
+        is this Problem shape (``PROBLEM_RESPONSES``). Without this handler,
+        FastAPI's own default renders ``{"detail": [...]}`` instead — a plain
+        list of objects, not ``application/problem+json``, silently breaking
+        that contract and handing the dashboard's error path a ``detail`` shape
+        (a list) its own type (``string | null``) doesn't allow for (PRE-M10
+        GATE finding, API/dashboard P1)."""
+        detail = "; ".join(
+            f"{'.'.join(str(part) for part in err['loc'])}: {err['msg']}" for err in exc.errors()
+        )
+        return _problem(request, 422, "Validation failed", detail)
+
+    @app.exception_handler(StarletteHTTPException)
+    async def handle_http_exception(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+        """Starlette's own routing failures — an unmatched path (404), a
+        method the route doesn't support (405), and so on — never reach
+        ``handle_engram_error`` either, for the same reason and with the same
+        fix as ``handle_request_validation_error`` above."""
+        detail = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
+        return _problem(request, exc.status_code, "HTTP error", detail)

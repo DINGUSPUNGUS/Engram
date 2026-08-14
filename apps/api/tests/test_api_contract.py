@@ -84,3 +84,39 @@ def test_openapi_schema_renders(client: TestClient) -> None:
     paths = response.json()["paths"]
     assert "/api/v1/memories" in paths
     assert "/api/v1/memories/{memory_id}/timeline" in paths
+
+
+# PRE-M10 GATE finding (API/dashboard P1): FastAPI's own request-parsing
+# failures (missing/out-of-range params, an unparseable path param, a
+# malformed body) and Starlette's own routing failures (unmatched path,
+# unsupported method) both run *before* any router body executes, so neither
+# ever reached ``handle_engram_error`` — every operation's OpenAPI schema
+# still promises its 4XX response is ``application/problem+json``
+# (``PROBLEM_RESPONSES``), but FastAPI's own default rendered a plain
+# ``{"detail": [...]}`` instead. Confirmed live pre-fix: none of the six
+# cases below returned ``application/problem+json``, and the dashboard's own
+# ``Problem.detail`` type (``string | null``) can't represent the list of
+# objects FastAPI's default shape hands back for a validation failure.
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("method", "path", "kwargs", "expected_status"),
+    [
+        ("GET", "/api/v1/search", {}, 422),  # missing required query param
+        ("GET", "/api/v1/memories", {"params": {"limit": 99999}}, 422),  # out of range
+        ("GET", "/api/v1/memories/not-a-uuid", {}, 422),  # unparseable path param
+        ("POST", "/api/v1/memories", {"json": {"title": "x"}}, 422),  # missing body field
+        ("GET", "/api/v1/nope-such-route", {}, 404),  # unmatched route
+        ("PUT", "/api/v1/memories", {}, 405),  # unsupported method on a real route
+    ],
+)
+def test_native_request_errors_are_still_problem_json(
+    client: TestClient, method: str, path: str, kwargs: dict[str, object], expected_status: int
+) -> None:
+    response = client.request(method, path, **kwargs)
+
+    assert response.status_code == expected_status
+    assert response.headers["content-type"].startswith("application/problem+json")
+    body = response.json()
+    assert isinstance(body["detail"], str)  # never the raw list FastAPI's default hands back
+    assert body["status"] == expected_status
+    assert body["instance"] == path
