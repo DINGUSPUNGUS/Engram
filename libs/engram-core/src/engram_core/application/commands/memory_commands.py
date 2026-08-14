@@ -25,6 +25,7 @@ from engram_core.application.dto import (
 )
 from engram_core.domain import scoring
 from engram_core.domain.errors import NotFoundError, StaleVersionError
+from engram_core.domain.events import current_schema_version
 from engram_core.domain.kinds import KindRegistry
 from engram_core.domain.memory import Memory
 from engram_core.domain.ports import Clock, MemoryRepository
@@ -190,7 +191,7 @@ class MemoryCommandService:
                 stream_id=stream_id,
                 stream_seq=current_version + offset + 1,
                 event_type=type(payload).__name__,
-                schema_version=1,
+                schema_version=current_schema_version(type(payload).__name__),
                 payload=payload,
                 occurred_at=occurred_at,
                 provenance=provenance,

@@ -405,7 +405,7 @@ class ProposalCommandService:
             stream_id=stream_id,
             stream_seq=stream_seq,
             event_type=type(payload).__name__,
-            schema_version=1,
+            schema_version=ev.current_schema_version(type(payload).__name__),
             payload=payload,
             occurred_at=occurred_at,
             provenance=provenance,

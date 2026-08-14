@@ -55,15 +55,23 @@ archived). History only grows; `git revert` semantics, not `git reset`.
 ## Export / import (portability)
 
 ```
-export:  events → markdown files (state) + .engram/events/*.ndjson (history) → git commit
-import:  git clone → reconciler seeds the event log from NDJSON → rebuild projections
+export:            events → markdown files (state) + .engram/events/*.ndjson (history) → git commit
+import --restore:  git clone → ImportEngine.restore() replays the log verbatim from NDJSON → rebuild
+import:            git clone → ImportEngine.import_documents() diffs markdown against current
+                    state → opens ONE proposal carrying the edit intents → normal review/merge
 ```
 
-Round-trip losslessness is a standing invariant (release-blocking if violated).
+Round-trip losslessness (`--restore`) is a standing invariant (release-blocking if violated).
 
 ## External edits
 
-The user edits a markdown file by hand → reconciler diffs the working tree against the
-manifest → produces candidate `MemoryEditedExternally` envelopes → they append through the
-normal command path (same validation, same conflict rules). Files never write to the
-database behind the log's back.
+The user edits a markdown file by hand → `engram import` diffs it against the current
+aggregate (`ImportEngine.import_documents`, ADR-0018 §4) → a proposal carrying the edit
+intents, never a duplicate `MemoryCreated` → normal review/merge (same validation, same
+conflict rules everything else appends through). Files never write to the database behind
+the log's back.
+
+`GitReconciler.import_external_changes` — an *automatic* diff-and-append path that would
+skip the explicit `engram import` step — is specified (the `MarkdownSync` port) but not
+implemented; its own module docstring says so. It is not the mechanism above, and nothing
+in the CLI calls it today.

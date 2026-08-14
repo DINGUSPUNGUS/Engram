@@ -64,6 +64,30 @@ def test_registry_covers_every_event_dataclass() -> None:
 
 
 @pytest.mark.unit
+def test_current_schema_version_agrees_with_the_registry_for_every_type() -> None:
+    """PRE-M10 GATE finding (event sourcing P2): command services used to
+    stamp new envelopes with a hardcoded literal ``schema_version=1``,
+    entirely independent of ``build_registry()``'s own per-type
+    ``schema_version`` — harmless today (every type happens to be 1), but a
+    silent landmine the moment any type's version is bumped per this
+    module's own documented process, since nothing would force the two
+    numbers to move together. ``current_schema_version`` now reads the same
+    source ``build_registry()`` does; this proves they can't drift for any
+    registered type."""
+    registry = domain_events.build_registry()
+    for event_type in registry.registered_types():
+        assert domain_events.current_schema_version(event_type) == registry.current_version(
+            event_type
+        )
+
+
+@pytest.mark.unit
+def test_current_schema_version_rejects_an_unregistered_type() -> None:
+    with pytest.raises(KeyError):
+        domain_events.current_schema_version("NotARealEventType")
+
+
+@pytest.mark.unit
 def test_registry_round_trips_a_created_event() -> None:
     from engram_events import deserialize_payload, new_uuid7, serialize_payload
 

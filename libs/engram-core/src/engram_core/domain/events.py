@@ -275,9 +275,34 @@ _EVENT_TYPES: dict[str, type] = {
 }
 
 
+# Every event type's write-side schema version — the one source both
+# ``build_registry()`` (the read-side registry command services correctly
+# hold no reference to) and ``current_schema_version`` below read from, so a
+# future per-type version bump here can never quietly disagree with what
+# command services stamp onto newly-appended envelopes (PRE-M10 GATE finding,
+# event sourcing P2: both call sites previously hardcoded the literal 1
+# directly, which this bump process's own docstring never touched).
+_SCHEMA_VERSIONS: dict[str, int] = dict.fromkeys(_EVENT_TYPES, 1)
+
+
 def build_registry() -> EventRegistry:
     """Build the canonical event registry. All payloads start at schema_version 1."""
     registry = EventRegistry()
     for event_type, payload_type in _EVENT_TYPES.items():
-        registry.register(event_type, payload_type, schema_version=1)
+        registry.register(event_type, payload_type, schema_version=_SCHEMA_VERSIONS[event_type])
     return registry
+
+
+def current_schema_version(event_type: str) -> int:
+    """The schema_version a newly-appended envelope of ``event_type`` must be
+    stamped with. Command services construct envelopes directly (ADR-0002's
+    choreography) but correctly hold no reference to the read-side registry
+    or the ``EventStore`` port — giving them one would be a real dependency
+    change, not a contained one — so this reads the identical literal source
+    ``build_registry()`` itself registers each type at, rather than each call
+    site carrying its own copy of the number that could drift from it.
+    """
+    try:
+        return _SCHEMA_VERSIONS[event_type]
+    except KeyError:
+        raise KeyError(f"unregistered event type: {event_type!r}") from None

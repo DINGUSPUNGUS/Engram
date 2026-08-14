@@ -74,3 +74,50 @@ def test_stream_position_is_unique(tmp_path: Path) -> None:
         conn.execute(insert, ("e1",))
         with pytest.raises(sqlite3.IntegrityError):
             conn.execute(insert, ("e2",))
+
+
+@pytest.mark.integration
+def test_projection_checkpoints_are_seeded_before_any_write(tmp_path: Path) -> None:
+    """PRE-M10 GATE finding (concurrency P2): every projection's checkpoint
+    row used to be created lazily, check-then-insert, on its own first
+    ``apply()`` call — a real race under high write concurrency (8+) on a
+    freshly-``init``'d space, confirmed reproducible: two writers' first
+    ``apply()`` calls could both see no row and both attempt the INSERT, the
+    loser crashing with a raw ``UNIQUE constraint failed`` while its own
+    event stayed durably logged but permanently invisible to the projection.
+    Migration 0006 seeds all three rows once, at migration time, so the
+    check-then-insert race can never be reached again: this proves the rows
+    already exist immediately after ``head``, before a single event has ever
+    been appended or applied."""
+    db_path = _migrated_db(tmp_path)
+    with sqlite3.connect(db_path) as conn:
+        rows = dict(
+            conn.execute("SELECT projection_name, last_global_seq FROM projection_checkpoints")
+        )
+    assert rows == {"state": 0, "search": 0, "proposals": 0}
+
+
+@pytest.mark.integration
+def test_seed_migration_is_idempotent_on_a_database_that_already_has_progress(
+    tmp_path: Path,
+) -> None:
+    """The seed must never regress real projection progress on a database
+    that reaches 0006 with rows already past 0 (the ordinary case: almost
+    every real space already has these rows from ordinary single-writer use
+    well before ever hitting the concurrency race 0006 closes)."""
+    db_path = tmp_path / "engram-test.db"
+    config = Config(str(_PACKAGE_ROOT / "alembic.ini"))
+    config.set_main_option("sqlalchemy.url", f"sqlite:///{db_path}")
+    command.upgrade(config, "0005")
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO projection_checkpoints (projection_name, last_global_seq)"
+            " VALUES ('state', 42)"
+        )
+    command.upgrade(config, "head")
+    with sqlite3.connect(db_path) as conn:
+        rows = dict(
+            conn.execute("SELECT projection_name, last_global_seq FROM projection_checkpoints")
+        )
+    assert rows["state"] == 42  # untouched, not reset to 0
+    assert rows["search"] == 0 and rows["proposals"] == 0  # still seeded for the other two

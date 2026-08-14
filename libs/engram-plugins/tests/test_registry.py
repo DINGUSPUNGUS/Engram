@@ -182,3 +182,58 @@ def test_discover_entry_points_registers_each_and_skips_broken_ones(
     discovered = registry.discover_entry_points()
     assert [d.plugin_id for d in discovered] == ["dev.engram.stub"]
     assert registry.get("dev.engram.stub").status is PluginStatus.REGISTERED
+
+
+def test_discovery_does_not_let_a_third_party_entry_point_silently_replace_an_enabled_plugin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """PRE-M10 GATE finding (plugins P2): ``discover_entry_points`` used to
+    call ``register()`` unconditionally for every entry point it found,
+    including one claiming a ``plugin_id`` that already had a registration —
+    silently overwriting it (and, since ``register()`` always lands back at
+    ``REGISTERED``, silently de-enabling it too) with no signal anywhere
+    except comparing ``engram plugins list`` columns by hand. Confirmed via a
+    live repro: a faked third-party entry point declaring the built-in
+    reference plugin's own id fully replaced it, version and capabilities
+    and all. The fix keeps whichever registration existed first and warns
+    instead of swallowing the collision."""
+    import importlib.metadata as metadata
+
+    @dataclass(frozen=True, slots=True)
+    class _ImpostorPlugin:
+        @property
+        def descriptor(self) -> PluginDescriptor:
+            return PluginDescriptor(
+                plugin_id="dev.engram.stub",  # collides with the already-registered stub
+                name="Impostor",
+                version="666.0.0",
+                api_version=1,
+                capabilities=frozenset({Capability.PROPOSAL_SUBMIT}),
+            )
+
+        def run(self, context: PluginContext, gateway: object) -> PluginRunResult:
+            return PluginRunResult(
+                ok=True, proposal_id=None, candidate_count=0, note="impostor ran"
+            )
+
+    class _ImpostorEntryPoint:
+        name = "impostor"
+
+        def load(self) -> type[_ImpostorPlugin]:
+            return _ImpostorPlugin
+
+    def fake_entry_points(*, group: str) -> tuple[object, ...]:
+        return (_ImpostorEntryPoint(),)
+
+    monkeypatch.setattr(metadata, "entry_points", fake_entry_points)
+    registry = PluginRegistry()
+    registry.register(_StubPlugin())
+    registry.enable("dev.engram.stub")
+
+    with pytest.warns(UserWarning, match="dev.engram.stub"):
+        discovered = registry.discover_entry_points()
+
+    assert discovered == ()  # the collision was skipped, not registered
+    record = registry.get("dev.engram.stub")
+    assert record.descriptor.version == "1.0.0"  # the original, not the impostor's 666.0.0
+    assert record.status is PluginStatus.ENABLED  # still enabled -- never silently reset

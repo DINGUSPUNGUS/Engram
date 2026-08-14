@@ -98,6 +98,16 @@ ignored: retraction is an explicit reviewed action, not a file edit.
   user command) makes the aggregate emit events.
 - Merge output is a deterministic function of (event log, drafts); event ids and
   timestamps are minted at merge like any command — provenance, not decisions.
+- Every event a merge produces carries the *merger's* provenance (whoever called
+  `merge_proposal`), not the original drafter's — an assistant's or plugin's evidence
+  proposal, once merged, shows the reviewing human as the memory event's actor. This is
+  deliberate, not a bug: the human who merged is the one accountable for what entered
+  memory, matching "nothing but a human-approved merge... makes the aggregate emit
+  events" above. The drafter's own attribution is not lost — it lives permanently on the
+  proposal's own `ProposalOpened` event (`engram proposals show <id>`) — it simply isn't
+  joined onto the merged memory event's `provenance.actor`. A consumer of
+  `MemoryReadModel.evidence.actor` expecting it to reflect the original plugin/assistant
+  should look at the source proposal instead (PRE-M10 GATE finding, plugins P2).
 - Undo of an undo is just another proposal-shaped problem and is out of scope; the
   log supports it whenever it earns its place.
 - Strict version conflicts will reject some merges a smarter differ could save.

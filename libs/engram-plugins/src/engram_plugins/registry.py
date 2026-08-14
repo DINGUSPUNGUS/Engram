@@ -10,6 +10,7 @@ corrupt in the first place).
 """
 
 import importlib.metadata
+import warnings
 from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import StrEnum
@@ -135,14 +136,43 @@ class PluginRegistry:
         A plugin whose entry point fails to load or whose descriptor is
         malformed is skipped, not fatal to discovering the rest — one broken
         third-party package must not block every other plugin.
+
+        A discovered ``plugin_id`` that collides with a registration already
+        present — an earlier explicit ``register()`` call (a built-in), or
+        another entry point earlier in this same discovery pass — is skipped
+        rather than silently overwritten: unlike calling ``register()``
+        directly (a sanctioned upgrade/downgrade for a plugin_id the caller
+        chose on purpose — see its own docstring), *discovery* enumerates
+        whatever happens to be installed, so a same-named third-party package
+        could otherwise silently replace, and de-enable, an already-``ENABLED``
+        plugin with no signal anywhere except comparing `engram plugins list`
+        columns by hand (PRE-M10 GATE finding, plugins P2 — confirmed via a
+        live repro: a faked third-party entry point claiming the built-in
+        reference plugin's own id silently replaced it, version and
+        capabilities and all, knocking it out of ``ENABLED``). The winner is
+        always whichever registration existed first; a ``UserWarning`` makes
+        the collision visible instead of purely silent.
         """
         discovered: list[PluginDescriptor] = []
         for entry_point in importlib.metadata.entry_points(group=group):
             try:
                 factory = entry_point.load()
                 plugin = factory() if callable(factory) else factory
-                discovered.append(self.register(plugin))
+                descriptor = plugin.descriptor
             except (EngramError, ImportError, TypeError, AttributeError):
+                continue
+            if descriptor.plugin_id in self._records:
+                warnings.warn(
+                    f"discovered plugin {descriptor.plugin_id!r} (entry point"
+                    f" {entry_point.name!r} in {group!r}) collides with an"
+                    " already-registered plugin of the same id -- keeping the"
+                    " existing registration. Uninstall or rename one of them.",
+                    stacklevel=2,
+                )
+                continue
+            try:
+                discovered.append(self.register(plugin))
+            except (EngramError, TypeError, AttributeError):
                 continue
         return tuple(discovered)
 
