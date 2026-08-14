@@ -84,7 +84,13 @@ jobs:
       - name: Lint (biome)
         run: pnpm exec biome ci .
       - name: Typecheck, test, build (turbo)
-        run: pnpm exec turbo run typecheck test build
+        # Scoped to the actual JS/TS packages. Every libs/* and apps/{api,cli,mcp}
+        # package also carries a typecheck/test script (so a single root `pnpm
+        # typecheck`/`test` covers the whole monorepo for local dev), but those
+        # shell out to `uv run ...` — this job never installs uv, so an
+        # unscoped `turbo run` here fails immediately on the first Python
+        # package turbo reaches. Python has its own job with its own toolchain.
+        run: pnpm exec turbo run typecheck test build --filter="./apps/web" --filter="./packages/*"
 
   contract:
     # The OpenAPI schema and the generated TS client must never drift.

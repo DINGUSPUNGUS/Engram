@@ -28,6 +28,16 @@
     "typecheck": {
       "inputs": ["src/**", "tests/**", "tsconfig*.json", "pyproject.toml"]
     },
+    // Next.js writes .next/types/**/*.ts (matched by apps/web's tsconfig.json
+    // "include") only as a side effect of `next build`. Without this, `tsc
+    // --noEmit` and `next build` are independent DAG nodes that turbo may run
+    // in either order — on a cold checkout (every CI run; no stale .next/
+    // lying around like a dev machine has) typecheck loses that race and
+    // fails on files that don't exist yet.
+    "@engram/web#typecheck": {
+      "dependsOn": ["^build", "build"],
+      "inputs": ["src/**", "tests/**", "tsconfig*.json"]
+    },
     "test": {
       "inputs": ["src/**", "tests/**", "pyproject.toml", "vitest.config.*"]
     }
