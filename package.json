@@ -17,7 +17,7 @@
     "gen:client": "pnpm --filter @engram/api-client generate"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.0.0",
+    "@biomejs/biome": "2.5.8",
     "turbo": "2.5.4"
   }
 }
