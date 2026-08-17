@@ -24,8 +24,13 @@ injecting one genuine concurrent write, through an independent
 harness sharing the same engine, at a chosen point mid-replay.
 """
 
+import contextlib
+import threading
+from uuid import UUID
+
 import pytest
 from sqlalchemy.engine import Engine
+from sqlmodel import Session, select
 
 from engram_core.application.commands.memory_commands import MemoryCommandService
 from engram_core.application.dto import CreateMemoryInput
@@ -36,6 +41,7 @@ from engram_core.domain.values import MemoryKind
 from engram_events import EventEnvelope, InProcessEventBus, Provenance, SystemClock
 from engram_storage_sqlite.event_store import SqliteEventStore
 from engram_storage_sqlite.maintenance import _MAX_REBUILD_ATTEMPTS, rebuild_projections
+from engram_storage_sqlite.models import MemoryRecord
 from engram_storage_sqlite.projections.state import StateProjection
 from engram_storage_sqlite.repositories import SqliteMemoryRepository
 
@@ -201,3 +207,129 @@ def test_rebuild_fails_loudly_rather_than_looping_forever_under_sustained_conten
     # envelope (the injected write always outruns it), so apply() was called
     # — and injected exactly one concurrent write — once per attempt.
     assert always_racing._n == _MAX_REBUILD_ATTEMPTS
+
+
+@pytest.mark.integration
+def test_rebuild_never_silently_double_applies_under_a_checkpoint_regression(
+    engine: Engine,
+) -> None:
+    """PRE-M10 follow-up finding (concurrency P0 -- a second, narrower instance
+    of the class the original P0 fix closed one layer up): the harness above
+    (``_InjectsOneConcurrentWrite``) always lets a concurrent write's *own*
+    ``apply()`` run to full completion, as one atomic unit, before the
+    rebuild reaches the same point -- it can only ever exercise the
+    checkpoint-*ahead* path (``landed != envelope.global_seq`` catches it
+    immediately). It can never express the narrower, only-real-threads-can-
+    produce window this test forces: the checkpoint update itself
+    (``checkpoint.last_global_seq = envelope.global_seq``) was an
+    unconditional overwrite with no compare-and-swap, keyed only by the
+    row's primary key. If a concurrent writer's *own* commit (racing ahead,
+    to global_seq 6) landed *between* two of the rebuild's own sequential
+    per-envelope commits (still working through 1-5), the rebuild's *next*
+    commit — for a lower global_seq it was legitimately processing —
+    silently regressed the checkpoint back down, erasing the record that 6
+    was already applied. The rebuild then reached envelope 6 itself and
+    re-applied it. For an event with no UNIQUE constraint at stake
+    (``MemoryAccessed``: ``access_count += 1``, not idempotent, not an
+    insert), that duplicate application landed with **no error at all**:
+    ``rebuild_projections`` returned successfully, and the checkpoint ended
+    up matching the log head exactly (what ``engram status`` calls
+    healthy) — over a projection that had just silently double-counted an
+    access. Confirmed via real-thread reproduction during the PRE-M10
+    follow-up audit (5/8 runs corrupted silently, no exception, before the
+    fix). The invariant this test actually enforces: whatever the exact
+    interleaving, a *reported success* must never coincide with wrong data
+    -- a loud failure is an acceptable outcome; silent corruption is not.
+    """
+    rebuilder = _Harness(engine)
+    for i in range(5):
+        rebuilder.create(f"m{i}")
+    assert rebuilder.state.checkpoint() == 5
+
+    with Session(engine) as session:
+        m0 = session.exec(select(MemoryRecord).where(MemoryRecord.title == "m0")).one()
+        m0_id = UUID(m0.id)
+
+    # Append the 6th event -- a mutation on an *existing* row, not an insert,
+    # so a double-apply trips no UNIQUE constraint and would otherwise be
+    # completely silent -- through a second, independent command service
+    # wired to a bus with no subscriber, so it lands durably in the log
+    # without any projection having applied it yet.
+    kinds = build_kind_registry()
+    silent_commands = MemoryCommandService(
+        SqliteMemoryRepository(rebuilder.store, kinds),
+        InProcessEventBus(),  # nobody subscribed -- append only, no apply
+        SystemClock(),
+        kinds,
+        rebuilder.store,
+    )
+    silent_commands.record_access(m0_id, None, USER)
+    envelope_6 = rebuilder.store.read_all(after_global_seq=5)[0]
+    assert envelope_6.event_type == "MemoryAccessed"
+    assert envelope_6.global_seq == 6
+
+    # Let the concurrent write race freely against the rebuild's *own*
+    # envelope 2-5 commits (the actual window the regression needs -- see
+    # docstring): only gated on m0 existing again post-``reset()`` (m0 is
+    # always envelope 1) and on not overlapping the rebuild's own attempt at
+    # envelope 6 itself (a separate, already-covered collision).
+    m0_recreated = threading.Event()
+    barrier = threading.Barrier(2)
+    fired = {"paused": False}
+    real_apply = StateProjection.apply
+
+    def _controlled_apply(self: StateProjection, envelope: EventEnvelope) -> None:
+        if self is rebuilder.state and envelope.global_seq == 1:
+            real_apply(self, envelope)
+            m0_recreated.set()
+            return
+        if self is rebuilder.state and envelope.global_seq == 6 and not fired["paused"]:
+            fired["paused"] = True
+            barrier.wait()
+        real_apply(self, envelope)
+
+    StateProjection.apply = _controlled_apply  # type: ignore[method-assign]
+    results: dict[str, object] = {}
+
+    def run_rebuild() -> None:
+        try:
+            results["replayed"] = rebuild_projections(rebuilder.store, [rebuilder.state])
+        except StorageError as exc:
+            results["error"] = exc
+
+    thread = threading.Thread(target=run_rebuild)
+    try:
+        thread.start()
+        assert m0_recreated.wait(timeout=10), "m0 was never recreated by rebuild"
+        # A second, independent StateProjection instance applying the same
+        # envelope the rebuild is concurrently working towards. A
+        # correctly-detected conflict here (state.py's compare-and-swap fix)
+        # is an accepted outcome -- a loud failure, not silent corruption --
+        # so it's swallowed rather than failing the test.
+        with contextlib.suppress(StorageError):
+            real_apply(StateProjection(engine), envelope_6)
+        barrier.wait()
+        thread.join(timeout=10)
+    finally:
+        StateProjection.apply = real_apply  # type: ignore[method-assign]
+
+    assert not thread.is_alive(), "rebuild thread hung"
+
+    with Session(engine) as session:
+        m0_after = session.exec(select(MemoryRecord).where(MemoryRecord.id == str(m0_id))).one()
+
+    if "error" in results:
+        # Loud and safe: the log is untouched, nothing was silently dropped
+        # or duplicated. Not the release-gate violation this test targets.
+        assert m0_after.access_count in (0, 1)
+        return
+
+    # Reported success: the release-gate invariant demands this be correct,
+    # not merely "checkpoint matches the log head".
+    assert results["replayed"] == 6
+    assert rebuilder.state.checkpoint() == 6
+    assert m0_after.access_count == 1, (
+        f"SILENT CORRUPTION: access_count={m0_after.access_count} but rebuild"
+        f" reported success ({results!r}) -- event log correct, projection"
+        " wrong, status would report healthy"
+    )

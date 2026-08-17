@@ -9,7 +9,7 @@ transaction — replaying the whole log always lands on the same rows
 import hashlib
 import json
 
-from sqlalchemy import func
+from sqlalchemy import func, inspect, update
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlmodel import Session, col, delete, select
@@ -55,8 +55,7 @@ class StateProjection:
                 if envelope.global_seq <= checkpoint.last_global_seq:
                     return  # idempotent replay / crash recovery
                 self._apply_event(session, envelope)
-                checkpoint.last_global_seq = envelope.global_seq
-                session.add(checkpoint)
+                self._advance_checkpoint(session, checkpoint, envelope.global_seq)
                 session.commit()
         except IntegrityError as exc:
             raise StorageError(
@@ -327,6 +326,58 @@ class StateProjection:
         if record is None:
             raise StorageError(f"state projection out of order: no row for {memory_id}")
         return record
+
+    def _advance_checkpoint(
+        self, session: Session, checkpoint: ProjectionCheckpointRecord, new_seq: int
+    ) -> None:
+        """Move the checkpoint from the value ``checkpoint`` was read at up to
+        ``new_seq`` -- a compare-and-swap, not a blind overwrite.
+
+        The previous ``checkpoint.last_global_seq = new_seq; session.add(...)``
+        wrote unconditionally, keyed only by the row's primary key: whichever
+        of two overlapping writers (a rebuild pass and a live write, the same
+        scenario ``rebuild_projections`` already defends against) committed
+        *last* simply won, silently regressing the checkpoint back down if it
+        happened to be the one further behind. That erased the record that a
+        *later* envelope had already been durably applied, so a rebuild
+        reaching that envelope on its own next iteration re-applied it —
+        for a non-conflicting event (no UNIQUE constraint at stake, e.g.
+        ``MemoryAccessed``), that duplicate application landed with no error
+        at all: ``engram rebuild`` reported success and the checkpoint ended
+        up matching the log head (``engram status``: healthy) over a
+        projection that had just silently double-counted an event. Confirmed
+        via real-thread reproduction (PRE-M10 follow-up finding, concurrency
+        P0 — a second, narrower instance of the same class the original P0
+        fix closed one layer up).
+
+        A single ``UPDATE ... WHERE last_global_seq = <the value we read>``
+        makes the write conditional on nothing having changed the row since:
+        zero rows affected means some other writer already moved it, so this
+        transaction's own view of "what's already applied" went stale
+        mid-flight and it must not blindly claim otherwise.
+        """
+        state = inspect(checkpoint)
+        assert state is not None
+        if state.transient:
+            # No row exists yet for this projection (bootstrap only --
+            # migration 0006 seeds it in the ordinary case): a plain INSERT,
+            # nothing to compare-and-swap against.
+            checkpoint.last_global_seq = new_seq
+            session.add(checkpoint)
+            return
+        prior = checkpoint.last_global_seq
+        result = session.exec(
+            update(ProjectionCheckpointRecord)
+            .where(col(ProjectionCheckpointRecord.projection_name) == _NAME)
+            .where(col(ProjectionCheckpointRecord.last_global_seq) == prior)
+            .values(last_global_seq=new_seq)
+        )
+        if result.rowcount != 1:
+            raise StorageError(
+                f"{_NAME} projection checkpoint moved from {prior} to something"
+                f" else while applying global_seq {new_seq} — a concurrent"
+                " writer changed it first"
+            )
 
     def _checkpoint_row(self, session: Session) -> ProjectionCheckpointRecord:
         checkpoint = session.exec(
