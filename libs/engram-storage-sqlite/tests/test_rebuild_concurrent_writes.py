@@ -210,6 +210,96 @@ def test_rebuild_fails_loudly_rather_than_looping_forever_under_sustained_conten
 
 
 @pytest.mark.integration
+def test_rebuild_recovers_from_a_real_thread_insert_collision(engine: Engine) -> None:
+    """Companion to the checkpoint-regression test below, covering the other
+    failure shape: an *insert*, not an update. The harness above
+    (``_InjectsOneConcurrentWrite``) always lets a concurrent write's own
+    ``apply()`` finish, as one atomic unit, before the rebuild reaches the
+    same envelope, so it can only ever exercise the checkpoint-*ahead* path
+    -- never a case where the rebuild's own INSERT for a ``MemoryCreated``
+    is genuinely in flight at the same instant as another writer's INSERT of
+    the identical row (same memory_id, same slug). Only real threads,
+    racing freely (no barrier gating other than release ordering — the
+    exact interleaving varies run to run, which is the point: the checkpoint
+    is no longer a reliable stand-in for "has this been applied", so the
+    rebuild's own attempt can still land after another writer's), can force
+    that window. Confirmed via a dedicated probe during the PRE-M10
+    follow-up audit: this used to raise a raw, uncaught IntegrityError-
+    derived ``StorageError`` on the rebuild's first attempt (real, though
+    never unsafe -- no row was ever lost); ``maintenance.py``'s fix
+    reclassifies it as the same retryable race once the checkpoint proves
+    the colliding row is already durably, correctly applied.
+    """
+    rebuilder = _Harness(engine)
+    for i in range(5):
+        rebuilder.create(f"m{i}")
+    assert rebuilder.state.checkpoint() == 5
+
+    kinds = build_kind_registry()
+    silent_commands = MemoryCommandService(
+        SqliteMemoryRepository(rebuilder.store, kinds),
+        InProcessEventBus(),  # nobody subscribed -- append only, no apply
+        SystemClock(),
+        kinds,
+        rebuilder.store,
+    )
+    silent_commands.create_memory(
+        CreateMemoryInput(
+            kind=MemoryKind.FACT,
+            title="concurrent-write",
+            content="",
+            attributes={"statement": "concurrent-write"},
+        ),
+        USER,
+    )
+    envelope_6 = rebuilder.store.read_all(after_global_seq=5)[0]
+    assert envelope_6.global_seq == 6
+
+    barrier = threading.Barrier(2)
+    fired = {"once": False}
+    real_apply = StateProjection.apply
+
+    def _paused_apply(self: StateProjection, envelope: EventEnvelope) -> None:
+        if self is rebuilder.state and envelope.global_seq == 6 and not fired["once"]:
+            fired["once"] = True
+            barrier.wait()
+        real_apply(self, envelope)
+
+    StateProjection.apply = _paused_apply  # type: ignore[method-assign]
+    results: dict[str, object] = {}
+
+    def run_rebuild() -> None:
+        try:
+            results["replayed"] = rebuild_projections(rebuilder.store, [rebuilder.state])
+        except StorageError as exc:  # pragma: no cover -- would mean the fix regressed
+            results["error"] = exc
+
+    thread = threading.Thread(target=run_rebuild)
+    try:
+        thread.start()
+        # This can itself now race the rebuild's own *ongoing* envelope 1-5
+        # progress (state.py's compare-and-swap fix correctly detects that
+        # too, a related but different race than the one this test targets)
+        # -- an accepted, already-covered outcome here, not a failure of
+        # this test.
+        with contextlib.suppress(StorageError):
+            StateProjection(engine).apply(envelope_6)
+        barrier.wait()
+        thread.join(timeout=10)
+    finally:
+        StateProjection.apply = real_apply  # type: ignore[method-assign]
+
+    assert not thread.is_alive(), "rebuild thread hung"
+    assert "error" not in results, f"rebuild did not recover: {results.get('error')}"
+    assert results["replayed"] == 6
+    assert rebuilder.state.checkpoint() == 6
+
+    with Session(engine) as session:
+        titles = {row.title for row in session.exec(select(MemoryRecord)).all()}
+    assert titles == {f"m{i}" for i in range(5)} | {"concurrent-write"}
+
+
+@pytest.mark.integration
 def test_rebuild_never_silently_double_applies_under_a_checkpoint_regression(
     engine: Engine,
 ) -> None:

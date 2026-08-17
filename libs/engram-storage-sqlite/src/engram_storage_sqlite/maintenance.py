@@ -50,7 +50,9 @@ def rebuild_projections(store: SqliteEventStore, projections: Sequence[Projectio
     cross-process lock — a real change to the port every adapter implements,
     not a contained one — this detects the exact moment a pass becomes
     unsound (a projection's checkpoint isn't left at precisely the envelope
-    just handed to it) and restarts the whole pass from ``reset()``. Bounded:
+    just handed to it, or ``apply()`` itself failed to insert a row a
+    concurrent writer already durably committed) and restarts the whole pass
+    from ``reset()``. Bounded:
     if the checkpoint keeps moving because writes are continuous rather than
     transient, this fails loudly with an actionable error instead of quietly
     returning a wrong result. Costs one extra ``checkpoint()`` read per
@@ -81,9 +83,45 @@ def _rebuild_pass(store: SqliteEventStore, projections: Sequence[Projection]) ->
         if not batch:
             return replayed
         for envelope in batch:
+            assert envelope.global_seq is not None  # persisted envelopes always have one
             for projection in projections:
                 if projection.handles(envelope.event_type):
-                    projection.apply(envelope)
+                    try:
+                        projection.apply(envelope)
+                    except StorageError:
+                        # apply() itself failed -- most often a live writer's
+                        # *own* apply() of this exact envelope already landed
+                        # (row + checkpoint) between this rebuild pass reading
+                        # the batch and reaching it, so our own insert collides
+                        # on the same UNIQUE slug/PK the two share, because
+                        # it's the same row. That is the identical
+                        # rebuild/live-write overlap the checkpoint-drift check
+                        # below exists for, just caught one step earlier (the
+                        # INSERT itself, not the post-apply checkpoint read) --
+                        # confirmed via real-thread reproduction (deterministic
+                        # single-process tests fully serialize the concurrent
+                        # write, so they can only ever land on the drift check,
+                        # never this narrower window).
+                        #
+                        # The checkpoint is the one signal this whole mechanism
+                        # already trusts, so use it here too rather than
+                        # guessing from the exception: if it has reached (or
+                        # passed) this envelope, whatever we just hit is
+                        # provably a duplicate of work already durably done,
+                        # safe to retry. If it hasn't, the failure is real —
+                        # e.g. two *different* events sharing an explicit slug
+                        # (MemoryCommandService.create_memory already documents
+                        # that as a plain StorageError, no concurrency
+                        # involved) — and retrying would only burn attempts
+                        # before failing anyway with a misleading "another
+                        # process kept writing" message. Re-raise unchanged.
+                        if projection.checkpoint() < envelope.global_seq:
+                            raise
+                        raise _RebuildRace(
+                            f"{projection.name} already had global_seq"
+                            f" {envelope.global_seq} applied by a concurrent"
+                            " writer when this rebuild pass tried to apply it too"
+                        ) from None
                     landed = projection.checkpoint()
                     if landed != envelope.global_seq:
                         raise _RebuildRace(
