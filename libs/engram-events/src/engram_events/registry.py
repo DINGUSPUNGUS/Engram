@@ -57,8 +57,24 @@ class EventRegistry:
         return self._registration(event_type).schema_version
 
     def upcast(self, event_type: str, data: dict[str, Any], from_version: int) -> dict[str, Any]:
-        """Migrate ``data`` from ``from_version`` up to the current schema version."""
+        """Migrate ``data`` from ``from_version`` up to the current schema version.
+
+        Raises:
+            UnknownEventTypeError: ``from_version`` is newer than this build's
+                registered schema version -- an event written by a newer
+                ``engram`` binary (docs/events.md "Forward compatibility":
+                until ``minimum_reader_version`` ships, "unknown event types
+                refuse to fold" is the backstop, and a schema version this
+                build never wrote is exactly that case for a known type).
+                Passing it through unmigrated would silently misinterpret a
+                shape this build doesn't understand rather than refuse it.
+        """
         registration = self._registration(event_type)
+        if from_version > registration.schema_version:
+            raise UnknownEventTypeError(
+                f"{event_type}: stored schema_version {from_version} is newer than"
+                f" this build's registered schema_version {registration.schema_version}"
+            )
         version = from_version
         while version < registration.schema_version:
             upcaster = registration.upcasters.get(version)

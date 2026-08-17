@@ -127,6 +127,43 @@ def test_unknown_event_type_fails_safely_instead_of_raw_crash(
 
 
 @pytest.mark.integration
+def test_future_schema_version_fails_safely_instead_of_silent_misinterpretation(
+    store: SqliteEventStore, engine: Engine
+) -> None:
+    """PRE-M10 follow-up finding: a row whose ``schema_version`` is *newer*
+    than this build's registry knows about (written by a newer ``engram``,
+    then read by this one, e.g. after a downgrade) used to skip
+    ``EventRegistry.upcast()``'s migration loop entirely — the loop only ran
+    while ``version < registration.schema_version`` — and return the raw,
+    unmigrated payload dict unchanged, silently misinterpreted as the
+    current shape instead of refused. Same class of defect as the
+    unknown-event-type case above (and the same fix shape: refuse via
+    ``UnknownEventTypeError``, translated here into the identical, already
+    newer-engram-aware ``StorageError`` message), just triggered by a
+    version number instead of a type name.
+    """
+    stream = new_uuid7()
+    store.append([_envelope(stream, 1, _created(stream))])
+    with Session(engine) as session:
+        session.add(
+            EventRecord(
+                event_id=str(new_uuid7()),
+                stream_id=str(stream),
+                stream_seq=2,
+                event_type="MemoryLifetimeChanged",
+                schema_version=999,  # no build of engram has ever written this
+                payload='{"lifetime_policy": "standard"}',
+                occurred_at=datetime(2026, 7, 12, 9, 30),
+                provenance='{"actor": "user"}',
+            )
+        )
+        session.commit()
+
+    with pytest.raises(StorageError, match="newer engram"):
+        store.read_stream(stream)
+
+
+@pytest.mark.integration
 def test_corrupted_payload_json_fails_safely_instead_of_raw_crash(
     store: SqliteEventStore, engine: Engine
 ) -> None:
